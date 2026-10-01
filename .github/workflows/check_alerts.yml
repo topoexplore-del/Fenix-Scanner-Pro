@@ -1,0 +1,78 @@
+name: Fenix — Alertas intradía (3 veces al día)
+
+on:
+  schedule:
+    # 3 veces al día en horario de mercado de EEUU (UTC). El pipeline es de
+    # cierre (anti-repaint descarta la vela en curso), igual que en AndFig.
+    - cron: '0 15,18,21 * * 1-5'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+# Mismo grupo que la actualización diaria: nunca corren a la vez, así ninguna
+# pisa el historial de alertas que acaba de guardar la otra.
+concurrency:
+  group: fenix-data
+  cancel-in-progress: false
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - run: pip install -r requirements.txt
+
+      - name: Traer lo último (la actualización diaria pudo publicar mientras esperaba)
+        run: git pull --ff-only origin "${GITHUB_REF_NAME}" || true
+
+      - name: Actualización rápida (grupos core, sin backtest, con guarda de salud)
+        run: python scripts/build_data.py --out-dir data --quick
+        env:
+          TZ: America/New_York
+          FINNHUB_KEY: ${{ secrets.FINNHUB_KEY }}
+
+      - name: Alertas (solo con datos sanos)
+        run: python scripts/check_alerts.py
+        env:
+          TZ: America/New_York
+          SMTP_USER: ${{ secrets.SMTP_USER }}
+          SMTP_PASS: ${{ secrets.SMTP_PASS }}
+          ALERT_EMAIL: ${{ secrets.ALERT_EMAIL }}
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+
+      - name: Seguimiento de alertas (historial con resultados)
+        run: python scripts/track_alerts.py
+        env:
+          TZ: America/New_York
+
+      - name: Datos del Seguimiento (parámetros + distancias EMA)
+        run: |
+          python scripts/seguimiento.py
+          node scripts/seguimiento_export.js
+        env:
+          TZ: America/New_York
+
+      - name: Commit (alertas y seguimiento; el snapshot rápido no se sube)
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add data/alerts.json data/alerts_state.json data/alerts_history.json \
+                  data/seguimiento.json data/seguimiento.csv data/seguimiento_es.csv
+          if git diff --staged --quiet; then echo "Sin cambios"; exit 0; fi
+          git commit -m "chore: Fenix alertas intradía [automated]"
+          git reset --hard HEAD   # descarta el snapshot rápido y health.json locales (no se suben)
+          for i in 1 2 3; do
+            git pull --rebase -X theirs origin "${GITHUB_REF_NAME}" && git push && exit 0
+            sleep 15
+          done
+          exit 1

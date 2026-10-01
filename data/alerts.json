@@ -1,43 +1,242 @@
 {
-  "checked_at": "2026-09-30 14:46:07 (Hora Colombia)",
+  "checked_at": "2026-10-01 12:56:42 (Hora Colombia)",
   "regime": {
     "regime": "BULL",
     "icon": "\ud83d\udfe2",
     "advice": "Mercado alcista \u2014 se\u00f1ales LONG operan con criterios normales.",
-    "spy_price": 765.63,
-    "spy_sma200": 716.13,
-    "spy_vs_sma200_pct": 6.91,
-    "drawdown_52w_pct": -1.33,
+    "spy_price": 762.63,
+    "spy_sma200": 716.11,
+    "spy_vs_sma200_pct": 6.5,
+    "drawdown_52w_pct": -1.72,
     "realized_vol_20d": 10.8
   },
-  "confirmed": 1,
+  "confirmed": 6,
   "signals": [
+    {
+      "ticker": "DINO",
+      "composite": 91,
+      "prob": 95,
+      "buffett": 65,
+      "mos": 9.8,
+      "rs_rank": 99,
+      "asof": "2026-09-30",
+      "live": null,
+      "status": null,
+      "max_chase": null,
+      "group": "\ud83c\uddfa\ud83c\uddf8 US Market",
+      "zones": {
+        "entry": 105.95,
+        "tp1": 110.53,
+        "tp2": 115.11,
+        "sl": 99.08
+      },
+      "periods": [
+        "3 Meses",
+        "6 Meses",
+        "1 A\u00f1o"
+      ]
+    },
+    {
+      "ticker": "ASC",
+      "composite": 91,
+      "prob": 95,
+      "buffett": 90,
+      "mos": 68.7,
+      "rs_rank": 96,
+      "asof": "2026-09-30",
+      "live": null,
+      "status": null,
+      "max_chase": null,
+      "group": "\ud83c\udf10 Listado completo",
+      "zones": {
+        "entry": 18.48,
+        "tp1": 19.09,
+        "tp2": 19.7,
+        "sl": 17.57
+      },
+      "periods": [
+        "1 Semana",
+        "1 Mes",
+        "3 Meses",
+        "6 Meses",
+        "1 A\u00f1o"
+      ]
+    },
+    {
+      "ticker": "NVDA",
+      "composite": 85,
+      "prob": 95,
+      "buffett": 85,
+      "mos": -82.0,
+      "rs_rank": 91,
+      "asof": "2026-09-30",
+      "live": null,
+      "status": null,
+      "max_chase": null,
+      "group": "\ud83c\udfaf Watchlist Core",
+      "zones": {
+        "entry": 226.59,
+        "tp1": 232.54,
+        "tp2": 238.49,
+        "sl": 217.66
+      },
+      "periods": [
+        "1 Mes",
+        "3 Meses",
+        "6 Meses"
+      ]
+    },
     {
       "ticker": "SHEL",
       "composite": 81,
       "prob": 95,
       "buffett": 50,
-      "mos": 20.8,
-      "rs_rank": 0,
-      "asof": "2026-09-29",
+      "mos": 20.9,
+      "rs_rank": 95,
+      "asof": "2026-09-30",
       "live": null,
       "status": null,
       "max_chase": null,
+      "group": "\ud83c\uddec\ud83c\udde7 Reino Unido",
       "zones": {
-        "entry": 94.66,
-        "tp1": 96.26,
-        "tp2": 97.86,
-        "sl": 92.26
+        "entry": 94.58,
+        "tp1": 96.13,
+        "tp2": 97.68,
+        "sl": 92.25
       },
       "periods": [
         "3 Meses",
         "6 Meses"
       ]
+    },
+    {
+      "ticker": "MOG/A",
+      "composite": 76,
+      "prob": 95,
+      "buffett": 50,
+      "mos": -64.2,
+      "rs_rank": 25,
+      "asof": "2026-09-30",
+      "live": null,
+      "status": null,
+      "max_chase": null,
+      "group": "\ud83c\uddfa\ud83c\uddf8 US Market",
+      "zones": {
+        "entry": 377.85,
+        "tp1": 389.92,
+        "tp2": 401.99,
+        "sl": 359.75
+      },
+      "periods": [
+        "3 Meses",
+        "6 Meses",
+        "1 A\u00f1o"
+      ]
+    },
+    {
+      "ticker": "NDSN",
+      "composite": 70,
+      "prob": 95,
+      "buffett": 85,
+      "mos": -65.2,
+      "rs_rank": 87,
+      "asof": "2026-09-30",
+      "live": null,
+      "status": null,
+      "max_chase": null,
+      "group": "\ud83c\uddfa\ud83c\uddf8 US Market",
+      "zones": {
+        "entry": 326.01,
+        "tp1": 332.13,
+        "tp2": 338.25,
+        "sl": 316.83
+      },
+      "periods": [
+        "3 Meses"
+      ]
     }
   ],
   "watchlist": [
     {
+      "ticker": "PBR",
+      "failed": [
+        "Radar"
+      ]
+    },
+    {
+      "ticker": "CRUS",
+      "failed": [
+        "Radar"
+      ]
+    },
+    {
+      "ticker": "PBR",
+      "failed": [
+        "Radar"
+      ]
+    },
+    {
       "ticker": "SMCI",
+      "failed": [
+        "Radar"
+      ]
+    },
+    {
+      "ticker": "SMCI",
+      "failed": [
+        "Radar"
+      ]
+    },
+    {
+      "ticker": "MU",
+      "failed": [
+        "Radar"
+      ]
+    },
+    {
+      "ticker": "MU",
+      "failed": [
+        "Radar"
+      ]
+    },
+    {
+      "ticker": "ADMA",
+      "failed": [
+        "Radar"
+      ]
+    },
+    {
+      "ticker": "VLO",
+      "failed": [
+        "Radar"
+      ]
+    },
+    {
+      "ticker": "PBYI",
+      "failed": [
+        "Radar"
+      ]
+    },
+    {
+      "ticker": "SCCO",
+      "failed": [
+        "Radar"
+      ]
+    },
+    {
+      "ticker": "AYA",
+      "failed": [
+        "Radar"
+      ]
+    },
+    {
+      "ticker": "AKO-A",
+      "failed": [
+        "Radar"
+      ]
+    },
+    {
+      "ticker": "ENS",
       "failed": [
         "Radar"
       ]
@@ -46,36 +245,6 @@
       "ticker": "MPWR",
       "failed": [
         "Radar"
-      ]
-    },
-    {
-      "ticker": "ALAB",
-      "failed": [
-        "Radar"
-      ]
-    },
-    {
-      "ticker": "POWL",
-      "failed": [
-        "Radar"
-      ]
-    },
-    {
-      "ticker": "SBFG",
-      "failed": [
-        "Analysis"
-      ]
-    },
-    {
-      "ticker": "AMD",
-      "failed": [
-        "Radar"
-      ]
-    },
-    {
-      "ticker": "EWT",
-      "failed": [
-        "Game Theory"
       ]
     }
   ]

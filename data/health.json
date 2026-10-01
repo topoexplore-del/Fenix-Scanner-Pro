@@ -1,7 +1,1 @@
-{
- "status": "INICIAL",
- "modo": "inicial",
- "session_ref": "2026-09-18",
- "nota": "Snapshot inicial = última actualización sana de AndFig (18/09/2026). Ejecuta 'Fenix — Actualización diaria' en Actions para traer el cierre actual.",
- "ultimo_full_ok": null
-}
+{"built_at":"2026-10-01T17:51:27.447383Z","modo":"full","status":"OK","session_ref":"2026-09-30","sesion_esperada":"2026-09-30","tickers":1133,"tickers_eeuu":1123,"desactualizados":0,"sin_precio":0,"pct_problemas":0.0,"umbral_pct":5.0,"reparados":0,"reparacion_fallida":0,"sin_datos":40,"ejemplos_desactualizados":[],"ejemplos_sin_datos":["ALS","ANSS","APGE","ATD","AVB","AWM","CRGIY","CRNX","CTRA","DWD","EA","EQR","EX9","FBRX","FEY","FI","FT2","GTLS","HBC2","HES","HOLX","IBE","IPCX","ITX","K"],"ultimo_full_ok":{"session_ref":"2026-09-30","built_at":"2026-10-01T17:51:27.447383Z"}}

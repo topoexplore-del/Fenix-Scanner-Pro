@@ -408,6 +408,41 @@ function emaTrip(e) {
   return [d20, d200, d200 == null ? null : r2(Math.abs(d20) - Math.abs(d200))];
 }
 
+function emaFill(a, cap) {
+  var ef = (cap && cap.ema_fill) || null;
+  if (!a.fill_date || !ef || ef.dia !== a.fill_date || ef.nivel !== a.entry) return {};
+  return ef;
+}
+
+// Hoja 2 del Excel: el detalle de cada medición, con la misma tabla de tu script
+var VERIF_COLUMNS = [
+  ["Ticket", "@"], ["Fecha Señal", "dd/mm/yyyy"], ["Fecha Fill", "dd/mm/yyyy"], ["Nivel ($ Entrada)", '"$"#,##0.00'],
+  ["TF", "@"], ["Evento", "@"], ["Hora", "@"], ["Ref", '"$"#,##0.00'],
+  ["EMA 20", "0.00"], ["Δ", "0.00"], ["%", "0.00"], ["EMA 200", "0.00"], ["Δ", "0.00"], ["%", "0.00"],
+  ["POC", "0.00"], ["Δ", "0.00"], ["%", "0.00"], ["POC→E20", "0.00"], ["%", "0.00"], ["POC→E200", "0.00"], ["%", "0.00"],
+  ["Nota", "@"]
+];
+function r2n(v) { return v == null ? null : Math.round(v * 100) / 100; }
+function buildVerif(history, seg, mode, day) {
+  var alerts = (history && history.alerts) || [], rows = (seg && seg.rows) || {}, out = [];
+  alerts.filter(function (a) { return inRange(a, mode, day); }).forEach(function (a) {
+    var ef = emaFill(a, rows[a.id]);
+    if (!a.fill_date) return;
+    [["1D", "d1"], ["1h", "h1"], ["5m", "m5"]].forEach(function (tf) {
+      var e = ef[tf[1]];
+      var base = [a.ticker, a.asof || null, a.fill_date, a.entry, tf[0]];
+      if (!e) { out.push(base.concat([null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, "se calcula en la corrida nocturna del día del fill"])); return; }
+      if (e.no_disponible || e.evento === "sin sesión") { out.push(base.concat([e.evento || null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, e.no_disponible || "sin sesión ese día"])); return; }
+      out.push(base.concat([e.evento, e.hora, e.ref, r2n(e.ema20), e.d20, e.p20, r2n(e.ema200), e.d200, e.p200,
+        r2n(e.poc), e.dpoc == null ? null : e.dpoc, e.ppoc == null ? null : e.ppoc,
+        e.poc_e20 == null ? null : e.poc_e20, e.poc_e20_p == null ? null : e.poc_e20_p,
+        e.poc_e200 == null ? null : e.poc_e200, e.poc_e200_p == null ? null : e.poc_e200_p,
+        (e.evento === "Gap apertura" || e.evento === "Gap intradía" ? "operado a " + e.operado + "; " : "") + (e.aviso || "")]));
+    });
+  });
+  return out;
+}
+
 // Una fila de la hoja SEGUIMIENTO a partir de la alerta y de lo capturado
 function buildRow(a, cap, opts) {
   opts = opts || {};
@@ -424,7 +459,9 @@ function buildRow(a, cap, opts) {
   o.gan = pct == null ? null : r4(pct / 100);
   o.p_cierre = o.gan == null || a.entry == null ? null : r2(a.entry * (1 + o.gan));
   o.estado = ESTADOS[a.status] || a.status;
-  var ema = cap.ema || {};
+  // Distancias EMA EN EL FILL (primer encuentro con el nivel de entrada el día
+  // del fill, como tu script "Nivel → EMAs + POC v3"). Sin fill → vacías.
+  var ema = emaFill(a, cap);
   var m5 = emaTrip(ema.m5), h1 = emaTrip(ema.h1), d1 = emaTrip(ema.d1);
   o.m5_20 = m5[0]; o.m5_200 = m5[1]; o.m5_dif = m5[2];
   o.h1_20 = h1[0]; o.h1_200 = h1[1]; o.h1_dif = h1[2];
@@ -507,6 +544,7 @@ return { DEFAULTS: DEFAULTS, GROUPS: GROUPS, COLUMNS: COLUMNS, ESTADOS: ESTADOS,
          markov: markov, gameTheory: gameTheory, entryZones: entryZones, analysis: analysis,
          hessian: hessian, laplace: laplace, buildRow: buildRow, buildTable: buildTable,
          inRange: inRange, toCSV: toCSV, tc: tc, sectorRoeAvgs: sectorRoeAvgs,
+         VERIF_COLUMNS: VERIF_COLUMNS, buildVerif: buildVerif, emaFill: emaFill,
          _lit: { compositeScore: compositeScore, compositeGrade: compositeGrade, earlinessScore: earlinessScore,
                  earlinessLabel: earlinessLabel, laplaceAnalysis: laplaceAnalysis, mkEstimateTransitionMatrix: mkEstimateTransitionMatrix } };
 });

@@ -1766,7 +1766,7 @@ function sgBlob(content,name,type){
   setTimeout(function(){URL.revokeObjectURL(a.href);a.remove()},1500);
 }
 function sgSerial(iso){var p=iso.split("-");return(Date.UTC(+p[0],+p[1]-1,+p[2])-Date.UTC(1899,11,30))/86400000}
-function sgXlsx(F,table,name){
+function sgXlsx(F,table,name,verif){
   var XLSX=window.XLSX;var aoa=[],g=[],merges=[],c0=0;
   F.GROUPS.forEach(function(gr){g.push(gr[0]);for(var i=1;i<gr[1];i++)g.push(null);merges.push({s:{r:0,c:c0},e:{r:0,c:c0+gr[1]-1}});c0+=gr[1]});
   aoa.push(g);aoa.push(F.COLUMNS.map(function(c){return c[1]}));
@@ -1781,6 +1781,20 @@ function sgXlsx(F,table,name){
   ws["!cols"]=F.COLUMNS.map(function(c){return{wch:Math.max(8,Math.min(26,String(c[1]).length+3))}});
   ws["!cols"][29].wch=20;ws["!cols"][31].wch=26;ws["!cols"][35].wch=14;ws["!cols"][2].wch=26;
   var wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,"SEGUIMIENTO");
+  // Hoja 2: detalle de las distancias EMA en el fill (misma tabla de tu script de TradingView)
+  if(verif&&verif.length){
+    var va=[["Distancias a las EMA en el FILL · primer encuentro del precio con el nivel de entrada el día del fill · Δ = EMA − nivel"],F.VERIF_COLUMNS.map(function(c){return c[0]})];
+    verif.forEach(function(r){va.push(r)});
+    var w2=XLSX.utils.aoa_to_sheet(va);
+    for(var r2=2;r2<va.length;r2++)for(var c2=0;c2<F.VERIF_COLUMNS.length;c2++){
+      var rf=XLSX.utils.encode_cell({r:r2,c:c2}),cl=w2[rf],fm=F.VERIF_COLUMNS[c2][1];if(!cl)continue;
+      if(fm==="dd/mm/yyyy"&&typeof cl.v==="string"&&/^\d{4}-\d{2}-\d{2}$/.test(cl.v)){cl.t="n";cl.v=sgSerial(cl.v);cl.z=fm}
+      else if(cl.t==="n"&&fm!=="@")cl.z=fm;
+    }
+    w2["!merges"]=[{s:{r:0,c:0},e:{r:0,c:F.VERIF_COLUMNS.length-1}}];
+    w2["!cols"]=F.VERIF_COLUMNS.map(function(c,i){return{wch:i===F.VERIF_COLUMNS.length-1?44:Math.max(8,c[0].length+3)}});
+    XLSX.utils.book_append_sheet(wb,w2,"Verificación EMA (fill)");
+  }
   XLSX.writeFile(wb,name+".xlsx");
 }
 window.downloadSeguimiento=function(){
@@ -1810,10 +1824,13 @@ window.downloadSeguimiento=function(){
     if(!table.length){st.textContent="No hay alertas para "+(mode==="todo"?"el historial":day)+".";return}
     var name="Fenix_Seguimiento_"+(mode==="todo"?"historial_completo":(mode==="senales"?"senales_":"movimientos_")+day);
     var iMk=F.COLUMNS.findIndex(function(c){return c[0]==="mk_score"}),iM5=F.COLUMNS.findIndex(function(c){return c[0]==="m5_20"});
-    var sinPar=table.filter(function(r){return r[iMk]==null}).length,sinEma=table.filter(function(r){return r[iM5]==null}).length;
-    var msg=table.length+" filas"+(sinPar?" · "+sinPar+" sin parámetros de pestañas":"")+(sinEma?" · "+sinEma+" sin EMA 5 min (las recientes se calculan en la próxima corrida; Yahoo solo guarda 60 días)":"");
+    var iFill=F.COLUMNS.findIndex(function(c){return c[0]==="f_fill"});
+    var sinPar=table.filter(function(r){return r[iMk]==null}).length;
+    var conFill=table.filter(function(r){return r[iFill]!=null}).length,sinEma=table.filter(function(r){return r[iFill]!=null&&r[iM5]==null}).length;
+    var msg=table.length+" filas"+(sinPar?" · "+sinPar+" sin parámetros de pestañas":"")+" · EMA en el fill: "+(conFill-sinEma)+" de "+conFill+" con fill"+(sinEma?" (las demás se calculan la noche del fill; Yahoo solo guarda 60 días de 5 min)":"")+(table.length>conFill?" · sin fill = EMA vacías":"");
     if(fmt==="xlsx"){
-      return loadScriptOnce(SHEETJS_URL).then(function(){sgXlsx(F,table,name);st.textContent="✅ "+msg}).catch(function(e){
+      var verif=F.buildVerif(hist,{rows:rows},mode,day);
+      return loadScriptOnce(SHEETJS_URL).then(function(){sgXlsx(F,table,name,verif);st.textContent="✅ "+msg}).catch(function(e){
         sgBlob(F.toCSV(table,"es"),name+".csv","text/csv;charset=utf-8");
         st.textContent="⚠️ No se pudo cargar el generador de Excel ("+e.message+"): se descargó CSV para Excel en español. "+msg;
       });

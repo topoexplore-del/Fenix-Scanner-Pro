@@ -196,8 +196,10 @@ table.an-table tr:hover{background:var(--bg3)}
     <input id="ticker-search" type="text" placeholder="Buscar ticker..." style="width:120px;padding:4px 8px;background:var(--bg3);border:1px solid var(--border);border-radius:4px;color:var(--txt);font-size:11px;font-family:inherit;text-transform:uppercase" onkeydown="if(event.key==='Enter')searchTicker()">
     <button onclick="searchTicker()" style="padding:4px 8px;background:var(--cyan);color:#000;border:none;border-radius:4px;cursor:pointer;font-size:10px;font-weight:700;font-family:inherit" title="Buscar">🔍</button>
   </div>
-  <button id="ls-btn" onclick="loadListado()" title="Cargar los ~9.600 activos adicionales del LISTADO (evaluados cada noche con la misma lógica)" style="margin-left:10px;padding:3px 10px;background:transparent;border:1px solid #ff8a50;border-radius:4px;color:#ff8a50;font-size:10px;font-weight:bold;cursor:pointer;font-family:inherit;white-space:nowrap">🌐 Listado completo</button>
-  <label id="ls-tabs-lbl" style="display:none;margin-left:6px;font-size:10px;color:var(--txt3);cursor:pointer;white-space:nowrap" title="Incluir el listado en Analysis, Entry Zones, Game Theory, Hessian, Markov, Laplace y Terminal (más lento)"><input type="checkbox" id="ls-tabs" onchange="window._lsTabs=this.checked;var on=document.querySelector('.tab-btn.active');if(on)switchTab(on.getAttribute('data-tab'),on)" style="vertical-align:middle"> + pestañas</label>
+  <span style="position:relative;display:inline-flex;align-items:center;margin-left:10px">
+    <button id="ls-btn" onclick="lsBtn()" title="Listado completo: ~9.600 activos adicionales del LISTADO, evaluados cada noche con la misma lógica. Clic para elegir en qué pestañas mostrarlo." style="padding:3px 10px;background:transparent;border:1px solid #ff8a50;border-radius:4px;color:#ff8a50;font-size:10px;font-weight:bold;cursor:pointer;font-family:inherit;white-space:nowrap">🌐 Listado completo ▾</button>
+    <div id="ls-panel" style="display:none;position:absolute;top:26px;left:0;z-index:999;min-width:270px;padding:10px 12px;background:var(--bg2);border:1px solid #ff8a50;border-radius:6px;box-shadow:0 8px 24px rgba(0,0,0,.6);font-size:11px;color:var(--txt)"></div>
+  </span>
   <div class="status"></div>
   <button onclick="generatePDFReport()" style="padding:4px 10px;background:var(--purple);color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:10px;font-weight:700;font-family:inherit;margin-right:6px" title="Descargar informe PDF del ticker seleccionado">📄 Informe PDF</button>
   <button onclick="location.reload()" style="padding:4px 10px;background:var(--green);color:#000;border:none;border-radius:4px;cursor:pointer;font-size:10px;font-weight:700;font-family:inherit;margin-right:8px" title="Actualizar datos">⟳ Refresh</button><div style="display:flex;flex-direction:column;align-items:flex-end;gap:2px">
@@ -346,6 +348,7 @@ window.onerror=function(msg,url,line,col,err){
 var chart1h=null,chart1d=null,snapshot=null,allRows=[],curIdx=0,multiMode=false,curGroup=null;
 
 window.switchTab=function(t,b){
+  window._curTab=t;
   document.querySelectorAll(".tab-btn").forEach(function(x){x.classList.remove("active")});
   document.querySelectorAll(".tab-view").forEach(function(x){x.classList.remove("active")});
   b.classList.add("active");document.getElementById("view-"+t).classList.add("active");
@@ -433,7 +436,7 @@ window.renderScreener=function(){
   var ord=document.getElementById("scr-order").value,dir=document.getElementById("scr-dir").value==="asc"?1:-1;
   var sig=document.getElementById("scr-signal").value,sec=document.getElementById("scr-sector").value;
   var q=(document.getElementById("scr-q").value||"").toLowerCase();
-  var all=getUniverse();
+  var all=_uniq(lsIncl("screener"));
   var hasNew=all.some(function(r){return r.signals!=null});
   var note=document.getElementById("scr-note");
   if(!hasNew){note.style.display="block";note.textContent="⚠️ Este snapshot fue generado con una versión anterior: las señales y patrones chartistas aparecerán tras la primera build real (workflow Full Refresh + Backtest). El ordenamiento por métricas disponibles sí funciona.";}
@@ -444,7 +447,7 @@ window.renderScreener=function(){
     return scrPass(r,sig);
   });
   rows.sort(function(a,b){var av=a[ord],bv=b[ord];if(av==null&&bv==null)return 0;if(av==null)return 1;if(bv==null)return -1;return dir===1?av-bv:bv-av});
-  document.getElementById("scr-count").textContent=rows.length+" resultados";
+  document.getElementById("scr-count").textContent=rows.length.toLocaleString("es-CO")+" resultados"+(lsIncl("screener")?" · incluye 🌐 listado completo":"");
   var h='<table style="width:100%;border-collapse:collapse;font-size:11px"><thead><tr>';
   ["Ticker","Sector","Precio",scrLabel(ord),"Día %","Señales","Patrones","Score","🏰","RS","Escenario (patrón)"].forEach(function(x){h+='<th style="text-align:left;padding:6px 8px;color:var(--txt3);font-size:9px;text-transform:uppercase;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--bg2)">'+x+"</th>"});
   h+="</tr></thead><tbody>";
@@ -624,31 +627,92 @@ function isEtfOrIndex(r){var s=r.sector||"";return s==="Index"||s==="ETF"||s==="
 
 function hasPrice(r){return r&&r.close!=null&&isFinite(r.close)}
 var LISTADO_G="🌐 Listado completo";
+// En qué pestañas se muestra el listado completo (lo eliges tú; se recuerda en este navegador)
+var LS_TABS=[["radar","Radar","rápido"],["screener","Screener","rápido"],["analysis","Analysis","lento"],["entry","Entry Zones","lento"],["gametheory","Game Theory","medio"],["hessian","Hessian","medio"],["markov","Markov","medio"],["laplace","Laplace","medio"],["terminal","Terminal","medio"]];
+window._lsOn=(function(){try{var x=JSON.parse(localStorage.getItem("fenix_ls_tabs")||"null");if(x&&typeof x==="object")return x}catch(e){}return{radar:true,screener:true}})();
+window._lsAuto=(function(){try{return localStorage.getItem("fenix_ls_auto")==="1"}catch(e){return false}})();
+window._curTab="radar";
+function lsIncl(t){return !!(window._lsLoaded&&window._lsOn[t])}
+function lsSave(){try{localStorage.setItem("fenix_ls_tabs",JSON.stringify(window._lsOn));localStorage.setItem("fenix_ls_auto",window._lsAuto?"1":"0")}catch(e){}}
 function _uniq(incl){var a=[],seen=new Set();if(!snapshot)return a;for(var g in snapshot.groups){if(g===LISTADO_G&&!incl)continue;snapshot.groups[g].forEach(function(r){if(!seen.has(r.ticker)){seen.add(r.ticker);a.push(r)}})}return a}
-// Pestañas analíticas: tus grupos (y el listado solo si marcas "también en pestañas")
-function getAllStocks(){return _uniq(!!window._lsTabs)}
+// Cada pestaña: tus grupos, y el listado completo solo si lo marcaste para ESA pestaña
+function getAllStocks(){return _uniq(lsIncl(window._curTab))}
 // Screener, buscador e informe PDF: todo lo cargado, incluido el listado completo
 function getUniverse(){return _uniq(true)}
 function findRow(t){for(var g in snapshot.groups){var rs=snapshot.groups[g];for(var i=0;i<rs.length;i++)if(rs[i].ticker===t)return rs[i]}return null}
 
 var LS_RADAR_MAX=300;
+function lsCount(){var r=snapshot&&snapshot.groups[LISTADO_G];return r?r.length.toLocaleString("es-CO"):""}
+function lsRerender(t){
+  if(t==="radar"){try{renderGroups()}catch(e){console.error("renderGroups:",e)}return}
+  if(t==="analysis"){var prev=window._curTab;window._curTab="analysis";try{populateFilters()}catch(e){}window._curTab=prev}
+  var on=document.querySelector(".tab-btn.active");
+  if(on&&on.getAttribute("data-tab")===t)switchTab(t,on);
+}
+function lsSync(){
+  document.querySelectorAll("input[data-ls-tab]").forEach(function(cb){cb.checked=!!window._lsOn[cb.getAttribute("data-ls-tab")]});
+  document.querySelectorAll(".ls-n").forEach(function(sp){sp.textContent=window._lsLoaded?"("+lsCount()+")":""});
+  var b=document.getElementById("ls-btn");if(!b)return;
+  if(window._lsLoaded){var n=LS_TABS.filter(function(x){return window._lsOn[x[0]]}).length;var h=(window._lsMeta||{}).health||{};
+    b.textContent="🌐 "+lsCount()+" · "+n+" pestaña"+(n===1?"":"s")+(h.status&&h.status!=="OK"?" ⚠️":"")+" ▾"}
+}
+function lsPanel(){
+  var p=document.getElementById("ls-panel");var h=(window._lsMeta||{}).health||{};
+  var html='<div style="font-weight:700;color:#ff8a50;margin-bottom:6px">🌐 Listado completo'+(window._lsLoaded?" · "+lsCount()+" activos":"")+'</div>';
+  if(window._lsLoaded)html+='<div style="color:var(--txt3);font-size:10px;margin-bottom:8px">Sesión '+((window._lsMeta||{}).session_ref||"—")+" · "+(h.con_fundamentales||0)+" con fundamentales · ETF apalancados/inversos excluidos: "+(h.apalancados_excluidos||0)+"</div>";
+  html+='<div style="color:var(--txt2);margin-bottom:4px">Mostrarlo en:</div>';
+  LS_TABS.forEach(function(x){
+    var col=x[2]==="rápido"?"var(--green)":x[2]==="medio"?"var(--amber)":"var(--red)";
+    html+='<label style="display:flex;align-items:center;gap:6px;padding:3px 0;cursor:pointer"><input type="checkbox" data-ls-tab="'+x[0]+'" onchange="lsSet(\''+x[0]+'\',this.checked)"'+(window._lsOn[x[0]]?" checked":"")+'> '+x[1]+' <span style="margin-left:auto;font-size:9px;color:'+col+'">'+x[2]+'</span></label>';
+  });
+  html+='<div style="display:flex;gap:6px;margin-top:8px"><button onclick="lsAll(true)" style="flex:1;padding:3px;background:var(--bg3);border:1px solid var(--border);border-radius:3px;color:var(--txt);cursor:pointer;font-size:10px;font-family:inherit">Todas</button><button onclick="lsAll(false)" style="flex:1;padding:3px;background:var(--bg3);border:1px solid var(--border);border-radius:3px;color:var(--txt);cursor:pointer;font-size:10px;font-family:inherit">Ninguna</button></div>';
+  html+='<label style="display:flex;align-items:center;gap:6px;margin-top:8px;color:var(--txt3);font-size:10px;cursor:pointer"><input type="checkbox" onchange="window._lsAuto=this.checked;lsSave()"'+(window._lsAuto?" checked":"")+'> Cargarlo automáticamente al abrir Fenix</label>';
+  html+='<div style="color:var(--txt3);font-size:9px;margin-top:6px">Cada pestaña también tiene su casilla 🌐 Listado. El buscador de ticker siempre busca en todo lo cargado.</div>';
+  p.innerHTML=html;
+}
+window.lsBtn=function(){
+  var p=document.getElementById("ls-panel");
+  if(!window._lsLoaded&&!window._lsLoading){window._lsAuto=true;lsSave();loadListado();}
+  lsPanel();p.style.display=p.style.display==="none"?"block":"none";
+};
+document.addEventListener("click",function(e){var p=document.getElementById("ls-panel");if(!p||p.style.display==="none")return;if(!e.target.closest("#ls-panel")&&!e.target.closest("#ls-btn"))p.style.display="none"});
+window.lsSet=function(t,v){
+  window._lsOn[t]=!!v;lsSave();lsSync();
+  if(v&&!window._lsLoaded){loadListado();return}
+  lsRerender(t);
+};
+window.lsAll=function(v){LS_TABS.forEach(function(x){window._lsOn[x[0]]=v});lsSave();lsSync();
+  if(v&&!window._lsLoaded){loadListado();return}
+  try{renderGroups()}catch(e){}var on=document.querySelector(".tab-btn.active");if(on)switchTab(on.getAttribute("data-tab"),on);lsPanel()};
+function lsInjectInline(){
+  LS_TABS.forEach(function(x){
+    if(x[0]==="radar")return;
+    var bar=document.querySelector("#view-"+x[0]+" .an-controls");if(!bar||bar.querySelector("input[data-ls-tab]"))return;
+    var lb=document.createElement("label");
+    lb.title="Incluir los ~9.600 activos del listado completo SOLO en esta pestaña ("+x[2]+")";
+    lb.style.cssText="display:inline-flex;align-items:center;gap:4px;margin-left:10px;padding:2px 8px;border:1px solid #ff8a5066;border-radius:4px;color:#ff8a50;font-size:10px;cursor:pointer;white-space:nowrap";
+    lb.innerHTML='<input type="checkbox" data-ls-tab="'+x[0]+'" onchange="lsSet(\''+x[0]+'\',this.checked)" style="vertical-align:middle"> 🌐 Listado <span class="ls-n"></span>';
+    bar.appendChild(lb);
+  });
+  lsSync();
+}
+var LS_RADAR_MAX=300;
 window.loadListado=function(){
-  var b=document.getElementById("ls-btn");if(!snapshot||window._lsLoaded){return}
-  b.textContent="🌐 Cargando listado…";
+  var b=document.getElementById("ls-btn");if(!snapshot||window._lsLoaded||window._lsLoading){return}
+  window._lsLoading=true;b.textContent="🌐 Cargando listado…";
   fetch("data/listado.json?v="+Date.now()).then(function(r){if(!r.ok)throw new Error("aún no existe data/listado.json (se genera en la actualización nocturna)");return r.json()}).then(function(L){
     var cols=L.cols||[];var rows=(L.rows||[]).map(function(v){var o={};for(var i=0;i<cols.length;i++)o[cols[i]]=v[i];return o});
     rows.sort(function(a,b){return(b.score||0)-(a.score||0)});
     snapshot.groups[LISTADO_G]=rows;
     snapshot.column_ranges=snapshot.column_ranges||{};snapshot.column_ranges[LISTADO_G]=L.column_ranges||{};
-    window._lsLoaded=true;window._lsMeta=L;
-    var h=L.health||{};
-    b.textContent="🌐 ✓ "+rows.length.toLocaleString("es-CO")+(h.status&&h.status!=="OK"?" ⚠️":"");
-    b.title="Sesión "+(L.session_ref||"—")+" · "+(h.con_fundamentales||0)+" con fundamentales · "+(h.desactualizados||0)+" desactualizados · ETF apalancados/inversos excluidos: "+(h.apalancados_excluidos||0);
-    document.getElementById("ls-tabs-lbl").style.display="inline";
-    try{renderGroups()}catch(e){console.error("renderGroups:",e)}
+    window._lsLoaded=true;window._lsLoading=false;window._lsMeta=L;
+    lsSync();if(document.getElementById("ls-panel").style.display!=="none")lsPanel();
     try{var se=document.getElementById("scr-sector");if(se&&se.options.length){var have={};[].forEach.call(se.options,function(o){have[o.value]=1});var secs={};rows.forEach(function(r){if(r.sector&&!have[r.sector])secs[r.sector]=1});Object.keys(secs).sort().forEach(function(x){var op=document.createElement("option");op.value=x;op.textContent=x;se.appendChild(op)})}}catch(e){}
-    var on=document.querySelector(".tab-btn.active");if(on&&on.getAttribute("data-tab")!=="radar")switchTab(on.getAttribute("data-tab"),on);
-  }).catch(function(e){b.textContent="🌐 Listado completo";alert("Listado completo: "+e.message)});
+    if(window._lsOn.radar)lsRerender("radar");
+    if(window._lsOn.analysis)lsRerender("analysis");
+    var on=document.querySelector(".tab-btn.active");var t=on&&on.getAttribute("data-tab");
+    if(t&&t!=="radar"&&window._lsOn[t])switchTab(t,on);
+  }).catch(function(e){window._lsLoading=false;b.textContent="🌐 Listado completo ▾";alert("Listado completo: "+e.message)});
 };
 
 function renderAlerts(){
@@ -676,6 +740,7 @@ function renderGroups(){
   if(!snapshot)return;var el=document.getElementById("groups-container");var h="";
   Object.keys(snapshot.groups).forEach(function(gn){
     var rows=snapshot.groups[gn];if(!rows||!rows.length)return;
+    if(gn===LISTADO_G&&!lsIncl("radar"))return;
     var lsTotal=0;if(gn===LISTADO_G&&rows.length>LS_RADAR_MAX){lsTotal=rows.length;rows=rows.slice(0,LS_RADAR_MAX)}
     var rng=(snapshot.column_ranges&&snapshot.column_ranges[gn])||{daily:[-5,5],"5d":[-10,10],"20d":[-15,15]};
     var sid=gn.replace(/[^a-zA-Z0-9]/g,"-");
@@ -2337,6 +2402,7 @@ function load(){
     try{renderAlerts()}catch(e){console.error("renderAlerts:",e)}
     try{renderGroups()}catch(e){gc.innerHTML='<div style="padding:40px;text-align:center;color:var(--red)">renderGroups error: '+e.message+'<br><span style="font-size:10px;color:var(--txt3)">'+e.stack+'</span></div>';return}
     try{populateFilters()}catch(e){console.error("populateFilters:",e)}
+    try{lsInjectInline();if(window._lsAuto)loadListado()}catch(e){console.error("listado:",e)}
   }).catch(function(err){
     gc.innerHTML='<div style="padding:40px;text-align:center"><div style="color:var(--red);font-size:14px">Error loading data</div><div style="color:var(--amber);margin:8px 0">'+err.message+'</div><div style="color:var(--txt3);font-size:10px">URL: '+location.href+'<br>If you just deployed, wait 2 min for GitHub Pages to build, then refresh.</div></div>';
   });

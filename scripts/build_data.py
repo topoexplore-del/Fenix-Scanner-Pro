@@ -330,18 +330,41 @@ def _slope_pct(points, ref_price):
     return m / ref_price * 100
 
 def detect_patterns(hist, lookback=140):
-    """Patrones chartistas VIGENTES: [{name,tipo,icon,conf,obj,esc,lines}].
-    v3 — Reglas de vigencia (evitan señalar figuras ya jugadas):
-      · RECENCIA: el último pivote que define la figura debe estar a ≤15
-        velas (≤20 en HCH y dobles) del presente. Un doble suelo cuyo 2º
-        suelo quedó 40 velas atrás es historia, no una señal.
-      · ALCANCE: el nivel de ruptura (cuello/resistencia) debe estar a ≤8%
-        del precio actual; si no, la señal no es accionable hoy.
-      · NO EXTENDIDO: si el precio ya superó el gatillo en >3%, el measured
-        move está en curso o consumado y NO se señala (evita perseguir).
-      · CONTENCIÓN: triángulos/canales/cuñas/rectángulos exigen que el
-        precio siga DENTRO de la formación (±2-3%).
-    El objetivo (obj) es la proyección clásica por measured move."""
+    """Patrones chartistas VIGENTES: [{name,tipo,icon,conf,obj,esc,lines,labels,estado,gatillo}].
+    v4 — auditoría Fenix (2026-10-01). Mismo catálogo que AndFig v3; se corrige
+    cómo se detectan y se dibujan:
+      · LÍNEAS COMO SE TRAZAN A MANO: soporte/resistencia de triángulos, canales,
+        cuñas y rectángulos pasan por DOS pivotes reales y dejan todas las velas
+        de un lado (antes era una regresión por el medio de los pivotes y el
+        precio la atravesaba en ~12% de las velas). Cada línea exige ≥2 toques.
+      · ALTURA ANCLADA: la altura de la figura se mide donde existen las dos
+        líneas (antes se extrapolaba una línea hacia atrás e inflaba objetivos).
+      · CUELLOS REALES: el cuello de HCH pasa por los mínimos/máximos de reacción
+        en sus velas reales (antes se dibujaba en el punto medio, ~7 velas fuera);
+        dobles/triples usan el mínimo/máximo real entre techos/suelos.
+      · CONTEXTO: las figuras de giro exigen la tendencia que revierten (≥8% en
+        las 40 velas previas): un "triple suelo" en plena subida es una base, no
+        un suelo (antes 30–49% de las figuras de giro no tenían tendencia previa).
+      · INVALIDACIÓN: se descarta la figura si el precio ya superó los techos (o
+        perforó los suelos) después de formarla, si en un HCH superó el hombro
+        derecho, o si salió por el lado contrario de un triángulo/canal/cuña.
+      · ESTADO: "formándose" (aún no rompe) o "ruptura confirmada" (rompió hace
+        poco y sigue a ≤3% del gatillo); el texto ya no dice "si rompe" cuando ya rompió.
+      · RUPTURA FALLIDA: si el precio ya rompió el cuello y volvió (cierre >1% al
+        otro lado y hoy de regreso), la figura se descarta. Cuello de HCH con
+        deriva ≤5% entre la cabeza y hoy (un cuello muy inclinado prolongado
+        deja de ser un nivel) y cabeza como extremo de toda la formación
+        (nada más alto/bajo justo antes del hombro izquierdo).
+      · SIN CONTRADICCIONES: si en un mismo activo salen figuras alcistas y
+        bajistas, se queda la más reciente (antes 14% de los casos). Un soporte o
+        resistencia horizontal al mismo nivel que los techos/suelos de una figura
+        de giro no se repite.
+      · DIBUJO: triples trazados por sus tres puntos; banderas y banderines
+        envuelven máximos y mínimos (el rango se sigue midiendo en cierres).
+      · TAZA CON ASA como la define O'Neil: subida previa ≥15%, fondo redondeado
+        (en "U") y asa en la mitad superior de la taza.
+    Se mantienen: recencia (≤15/20 velas), alcance del gatillo (≤8%), no
+    extendido (≤3% más allá del gatillo) y el objetivo por measured move."""
     if len(hist) < 60:
         return []
     RECENT = 15          # velas máximas desde el último pivote (líneas de tendencia)
@@ -349,202 +372,320 @@ def detect_patterns(hist, lookback=140):
     REACH = 0.08         # el gatillo debe estar a ≤8% del precio
     EXT = 0.03           # extensión máxima permitida más allá del gatillo
     MAX_SPAN = 60        # separación máxima entre los dos techos/suelos
+    PRIOR = 0.08         # tendencia previa mínima para figuras de giro
+    TOUCH = 0.012        # un pivote "toca" una línea si está a ≤1,2%
 
     ph, pl, nb = find_pivots(hist, k=4, lookback=lookback)
-    c = hist["Close"].tail(lookback).reset_index(drop=True)
-    n = len(c)
-    close = float(c.iloc[-1])
+    tail = hist.tail(lookback).reset_index(drop=True)
+    C = tail["Close"].astype(float).values
+    Hh = tail["High"].astype(float).values
+    Ll = tail["Low"].astype(float).values
+    n = len(C)
+    close = float(C[-1])
     found = []
 
     def pct(p):
         return round((p / close - 1) * 100, 1)
 
-    def add(name, tipo, conf, obj=None, esc=None, lines=None):
+    def add(name, tipo, conf, obj=None, esc=None, lines=None, labels=None, estado=None, gatillo=None, last=0):
         icon = "🟢" if tipo == "bullish" else ("🔴" if tipo == "bearish" else "🟡")
         found.append({"name": name, "tipo": tipo, "icon": icon, "conf": int(conf),
                       "obj": round(obj, 2) if obj else None, "esc": esc,
-                      "lines": [[int(a), round(b, 2), int(d), round(e, 2)] for a, b, d, e in (lines or [])]})
+                      "lines": [[int(a), round(float(b), 2), int(d), round(float(e), 2)] for a, b, d, e in (lines or [])],
+                      "labels": labels or [], "estado": estado,
+                      "gatillo": round(float(gatillo), 2) if gatillo else None, "_last": int(last)})
 
     def reach_ok(level):
         return abs(level / close - 1) <= REACH
 
-    # ── Doble/Triple techo — vigente solo entre el 2º techo y la ruptura ──
+    def rise_into(x, level):     # subida previa hasta `level` (para techos)
+        pre = C[max(0, x - 40):x + 1]
+        return len(pre) >= 10 and level / float(pre.min()) - 1 >= PRIOR
+
+    def fall_into(x, level):     # caída previa hasta `level` (para suelos)
+        pre = C[max(0, x - 40):x + 1]
+        return len(pre) >= 10 and float(pre.max()) / level - 1 >= PRIOR
+
+    # ── Doble/Triple techo ──
     if len(ph) >= 2:
         (i1, v1), (i2, v2) = ph[-2], ph[-1]
-        if 8 <= i2 - i1 <= MAX_SPAN and abs(v2 - v1) / max(v1, v2) <= 0.025 \
-           and (n - 1 - i2) <= RECENT_TOPS:
-            valley = float(c.iloc[i1:i2 + 1].min())
+        if 8 <= i2 - i1 <= MAX_SPAN and abs(v2 - v1) / max(v1, v2) <= 0.025 and (n - 1 - i2) <= RECENT_TOPS:
             top = (v1 + v2) / 2
-            # vigencia: bajo los techos, pero SIN haber roto ya el cuello en exceso
-            if valley <= top * 0.96 and close < top * 0.995 and close > valley * (1 - EXT) \
-               and reach_ok(valley):
+            ifirst, vfirst = i1, v1
+            triple = False
+            if len(ph) >= 3:
+                i0, v0 = ph[-3]
+                if 8 <= i1 - i0 <= MAX_SPAN and abs(v0 - top) / top <= 0.03 and float(Ll[i0:i1 + 1].min()) <= top * 0.97:
+                    triple, ifirst, vfirst = True, i0, v0
+            seg = Ll[ifirst:i2 + 1]
+            iv = ifirst + int(seg.argmin()); valley = float(seg.min())
+            after_hi = float(Hh[i2 + 1:].max()) if i2 + 1 < n else 0.0
+            failed = i2 + 1 < n and close >= valley and bool((C[i2 + 1:] < valley * 0.99).any())
+            if valley <= top * 0.96 and rise_into(ifirst, vfirst) and after_hi <= max(v1, v2) * 1.01 \
+               and reach_ok(valley) and valley * (1 - EXT) < close < top and not failed:
+                broke = close < valley
                 obj = valley - (top - valley)
-                esc = f"Bajista: si pierde el cuello ${valley:.2f}, proyección ≈ ${obj:.2f} ({pct(obj):+.1f}%)"
-                lines = [(i1, v1, i2, v2), (max(0, i1 - 4), valley, min(n - 1, i2 + 6), valley)]
-                triple = len(ph) >= 3 and abs(ph[-3][1] - v1) / v1 <= 0.03 and i2 - ph[-3][0] <= MAX_SPAN
-                if triple:
-                    lines[0] = (ph[-3][0], ph[-3][1], i2, v2)
-                add("Triple techo" if triple else "Doble techo", "bearish", 75 if triple else 70, obj, esc, lines)
+                esc = (f"Bajista — ruptura confirmada: perdió el cuello ${valley:.2f}; objetivo ≈ ${obj:.2f} ({pct(obj):+.1f}%)"
+                       if broke else f"Bajista: si pierde el cuello ${valley:.2f}, proyección ≈ ${obj:.2f} ({pct(obj):+.1f}%)")
+                add("Triple techo" if triple else "Doble techo", "bearish", 75 if triple else 70, obj, esc,
+                    ([(i0, v0, i1, v1), (i1, v1, i2, v2)] if triple else [(i1, v1, i2, v2)]) + [(iv, valley, n - 1, valley)],
+                    (["techos", ""] if triple else ["techos"]) + ["cuello"],
+                    "ruptura confirmada" if broke else "formándose", valley, i2)
     # ── Doble/Triple suelo ──
     if len(pl) >= 2:
         (i1, v1), (i2, v2) = pl[-2], pl[-1]
-        if 8 <= i2 - i1 <= MAX_SPAN and abs(v2 - v1) / max(v1, v2) <= 0.025 \
-           and (n - 1 - i2) <= RECENT_TOPS:
-            peak = float(c.iloc[i1:i2 + 1].max())
+        if 8 <= i2 - i1 <= MAX_SPAN and abs(v2 - v1) / max(v1, v2) <= 0.025 and (n - 1 - i2) <= RECENT_TOPS:
             bot = (v1 + v2) / 2
-            if peak >= bot * 1.04 and close > bot * 1.005 and close < peak * (1 + EXT) \
-               and reach_ok(peak):
+            ifirst, vfirst = i1, v1
+            triple = False
+            if len(pl) >= 3:
+                i0, v0 = pl[-3]
+                if 8 <= i1 - i0 <= MAX_SPAN and abs(v0 - bot) / bot <= 0.03 and float(Hh[i0:i1 + 1].max()) >= bot * 1.03:
+                    triple, ifirst, vfirst = True, i0, v0
+            seg = Hh[ifirst:i2 + 1]
+            ip = ifirst + int(seg.argmax()); peak = float(seg.max())
+            after_lo = float(Ll[i2 + 1:].min()) if i2 + 1 < n else 1e18
+            failed = i2 + 1 < n and close <= peak and bool((C[i2 + 1:] > peak * 1.01).any())
+            if peak >= bot * 1.04 and fall_into(ifirst, vfirst) and after_lo >= min(v1, v2) * 0.99 \
+               and reach_ok(peak) and bot < close < peak * (1 + EXT) and not failed:
+                broke = close > peak
                 obj = peak + (peak - bot)
-                esc = f"Alcista: si rompe el cuello ${peak:.2f}, proyección ≈ ${obj:.2f} ({pct(obj):+.1f}%)"
-                lines = [(i1, v1, i2, v2), (max(0, i1 - 4), peak, min(n - 1, i2 + 6), peak)]
-                triple = len(pl) >= 3 and abs(pl[-3][1] - v1) / v1 <= 0.03 and i2 - pl[-3][0] <= MAX_SPAN
-                if triple:
-                    lines[0] = (pl[-3][0], pl[-3][1], i2, v2)
-                add("Triple suelo" if triple else "Doble suelo", "bullish", 75 if triple else 70, obj, esc, lines)
+                esc = (f"Alcista — ruptura confirmada: superó el cuello ${peak:.2f}; objetivo ≈ ${obj:.2f} ({pct(obj):+.1f}%)"
+                       if broke else f"Alcista: si rompe el cuello ${peak:.2f}, proyección ≈ ${obj:.2f} ({pct(obj):+.1f}%)")
+                add("Triple suelo" if triple else "Doble suelo", "bullish", 75 if triple else 70, obj, esc,
+                    ([(i0, v0, i1, v1), (i1, v1, i2, v2)] if triple else [(i1, v1, i2, v2)]) + [(ip, peak, n - 1, peak)],
+                    (["suelos", ""] if triple else ["suelos"]) + ["cuello"],
+                    "ruptura confirmada" if broke else "formándose", peak, i2)
 
-    # ── HCH y HCH invertido — cuello por los máximos/mínimos de REACCIÓN ──
+    # ── HCH y HCH invertido — cuello por los mínimos/máximos de reacción reales ──
     if len(ph) >= 3:
         (x1, s1), (x2, hd), (x3, s2) = ph[-3], ph[-2], ph[-1]
         if hd > s1 * 1.03 and hd > s2 * 1.03 and abs(s1 - s2) / max(s1, s2) <= 0.04 \
-           and (n - 1 - x3) <= RECENT_TOPS and x3 - x1 <= MAX_SPAN * 1.5:
-            r1 = float(c.iloc[x1:x2 + 1].min()); r2 = float(c.iloc[x2:x3 + 1].min())
-            nl = (r1 + r2) / 2  # cuello = mínimos de reacción, NO el mínimo global
-            if reach_ok(nl) and close > nl * (1 - EXT) and close < hd:
-                obj = nl - (hd - nl)
-                esc = f"Bajista: cabeza ${hd:.2f}; perder el cuello ${nl:.2f} proyecta ≈ ${obj:.2f} ({pct(obj):+.1f}%)"
-                mid1, mid2 = (x1 + x2) // 2, (x2 + x3) // 2
+           and (n - 1 - x3) <= RECENT_TOPS and x3 - x1 <= MAX_SPAN * 1.5 and x2 - x1 >= 5 and x3 - x2 >= 5:
+            a1 = x1 + int(Ll[x1:x2 + 1].argmin()); r1 = float(Ll[a1])
+            a2 = x2 + int(Ll[x2:x3 + 1].argmin()); r2 = float(Ll[a2])
+            m = (r2 - r1) / max(1, a2 - a1)
+            nl_now = r1 + m * (n - 1 - a1); nl_head = r1 + m * (x2 - a1)
+            after_hi = float(Hh[x3 + 1:].max()) if x3 + 1 < n else 0.0
+            jj = np.arange(x3 + 1, n)
+            failed = len(jj) > 0 and close >= nl_now and bool((C[jj] < (r1 + m * (jj - a1)) * 0.99).any())
+            if rise_into(x1, s1) and after_hi <= s2 * 1.01 and reach_ok(nl_now) and nl_now * (1 - EXT) < close <= s2 \
+               and not failed and abs(nl_now / nl_head - 1) <= 0.05 \
+               and float(Hh[max(0, x1 - (x2 - x1)):x3 + 1].max()) <= hd * 1.001:   # la cabeza es el punto más alto
+                broke = close < nl_now
+                obj = nl_now - (hd - nl_head)
+                esc = (f"Bajista — ruptura confirmada: cabeza ${hd:.2f}; perdió el cuello (${nl_now:.2f} hoy); objetivo ≈ ${obj:.2f} ({pct(obj):+.1f}%)"
+                       if broke else f"Bajista: cabeza ${hd:.2f}; perder el cuello ${nl_now:.2f} proyecta ≈ ${obj:.2f} ({pct(obj):+.1f}%)")
                 add("Hombro-Cabeza-Hombro", "bearish", 72, obj, esc,
-                    [(x1, s1, x2, hd), (x2, hd, x3, s2), (mid1, r1, mid2, r2)])
+                    [(x1, s1, x2, hd), (x2, hd, x3, s2), (a1, r1, n - 1, nl_now)], ["cabeza", "", "cuello"],
+                    "ruptura confirmada" if broke else "formándose", nl_now, x3)
     if len(pl) >= 3:
         (x1, s1), (x2, hd), (x3, s2) = pl[-3], pl[-2], pl[-1]
         if hd < s1 * 0.97 and hd < s2 * 0.97 and abs(s1 - s2) / max(s1, s2) <= 0.04 \
-           and (n - 1 - x3) <= RECENT_TOPS and x3 - x1 <= MAX_SPAN * 1.5:
-            r1 = float(c.iloc[x1:x2 + 1].max()); r2 = float(c.iloc[x2:x3 + 1].max())
-            nl = (r1 + r2) / 2
-            if reach_ok(nl) and close < nl * (1 + EXT) and close > hd:
-                obj = nl + (nl - hd)
-                esc = f"Alcista: romper el cuello ${nl:.2f} proyecta ≈ ${obj:.2f} ({pct(obj):+.1f}%)"
-                mid1, mid2 = (x1 + x2) // 2, (x2 + x3) // 2
+           and (n - 1 - x3) <= RECENT_TOPS and x3 - x1 <= MAX_SPAN * 1.5 and x2 - x1 >= 5 and x3 - x2 >= 5:
+            a1 = x1 + int(Hh[x1:x2 + 1].argmax()); r1 = float(Hh[a1])
+            a2 = x2 + int(Hh[x2:x3 + 1].argmax()); r2 = float(Hh[a2])
+            m = (r2 - r1) / max(1, a2 - a1)
+            nl_now = r1 + m * (n - 1 - a1); nl_head = r1 + m * (x2 - a1)
+            after_lo = float(Ll[x3 + 1:].min()) if x3 + 1 < n else 1e18
+            jj = np.arange(x3 + 1, n)
+            failed = len(jj) > 0 and close <= nl_now and bool((C[jj] > (r1 + m * (jj - a1)) * 1.01).any())
+            if fall_into(x1, s1) and after_lo >= s2 * 0.99 and reach_ok(nl_now) and s2 <= close < nl_now * (1 + EXT) \
+               and not failed and abs(nl_now / nl_head - 1) <= 0.05 \
+               and float(Ll[max(0, x1 - (x2 - x1)):x3 + 1].min()) >= hd * 0.999:   # la cabeza es el punto más bajo
+                broke = close > nl_now
+                obj = nl_now + (nl_head - hd)
+                esc = (f"Alcista — ruptura confirmada: superó el cuello (${nl_now:.2f} hoy); objetivo ≈ ${obj:.2f} ({pct(obj):+.1f}%)"
+                       if broke else f"Alcista: romper el cuello ${nl_now:.2f} proyecta ≈ ${obj:.2f} ({pct(obj):+.1f}%)")
                 add("HCH invertido", "bullish", 72, obj, esc,
-                    [(x1, s1, x2, hd), (x2, hd, x3, s2), (mid1, r1, mid2, r2)])
+                    [(x1, s1, x2, hd), (x2, hd, x3, s2), (a1, r1, n - 1, nl_now)], ["cabeza", "", "cuello"],
+                    "ruptura confirmada" if broke else "formándose", nl_now, x3)
 
-    # ── Líneas de tendencia: exigen contención Y recencia ──
+    # ── Triángulos, canales, cuñas y rectángulos: líneas trazadas por pivotes ──
+    def best_line(piv, upper):
+        """Línea por dos pivotes que deja todas las velas del tramo de un lado
+        (máximos por debajo de la resistencia / mínimos por encima del soporte).
+        Elige la de más toques; a igualdad, la más reciente."""
+        xa, xb = piv[0][0], piv[-1][0]
+        xs = np.arange(xa, xb + 1)
+        best = None
+        for a in range(len(piv)):
+            for b in range(a + 1, len(piv)):
+                (xp, yp), (xq, yq) = piv[a], piv[b]
+                if xq == xp:
+                    continue
+                m = (yq - yp) / (xq - xp)
+                ys = yp + m * (xs - xp)
+                ok = (Hh[xs] <= ys * 1.003).all() if upper else (Ll[xs] >= ys * 0.997).all()
+                if not ok:
+                    continue
+                tx = [x for (x, y) in piv if abs(y - (yp + m * (x - xp))) / y <= TOUCH]
+                key = (len(tx), xq, xp)
+                if best is None or key > best[0]:
+                    best = (key, m, yp - m * xp, min(tx))      # min(tx): primer pivote que toca
+        return best
+
     rp = ph[-4:] if len(ph) >= 3 else []
     rl = pl[-4:] if len(pl) >= 3 else []
-    sh = _slope_pct(rp, close)
-    sl = _slope_pct(rl, close)
-    trend60 = (close / float(c.iloc[max(0, n - 61)]) - 1) * 100
+    trend60 = (close / float(C[max(0, n - 61)]) - 1) * 100
+    if rp and rl and (n - 1 - max(rp[-1][0], rl[-1][0])) <= RECENT:
+        U = best_line(rp, True)
+        D = best_line(rl, False)
+        if U and D and U[0][0] >= 2 and D[0][0] >= 2:
+            (_, mh, bh, xu0), (_, ml, bl_, xd0) = U, D
+            xs0 = max(xu0, xd0)          # la figura empieza donde ya existen las dos líneas (primer toque de cada una)
+            upper = lambda x: mh * x + bh
+            lower = lambda x: ml * x + bl_
+            upper_now, lower_now = upper(n - 1), lower(n - 1)
+            height = upper(xs0) - lower(xs0)
+            sh, sl = mh / close * 100, ml / close * 100          # pendiente en % por vela
+            last_piv = max(rp[-1][0], rl[-1][0])
+            post = C[last_piv + 1:]
+            if height > 0 and upper_now > lower_now and n - 1 - xs0 >= 10:
+                FLAT, RISE = 0.06, 0.10
+                # "plana" = pendiente baja Y recorrido total ≤3% a lo largo de la figura
+                h_flat = abs(sh) < FLAT and abs(mh * (n - 1 - xu0)) / close <= 0.03
+                l_flat = abs(sl) < FLAT and abs(ml * (n - 1 - xd0)) / close <= 0.03
+                h_up, l_up = sh > RISE, sl > RISE
+                h_dn, l_dn = sh < -RISE, sl < -RISE
+                two = [(xu0, upper(xu0), n - 1, upper_now), (xd0, lower(xd0), n - 1, lower_now)]
+                lbl = ["resistencia", "soporte"]
+                inside = lower_now * 0.99 <= close <= upper_now * 1.01
+                # salida reciente por arriba / abajo (≤3%) y fallo por el lado contrario
+                out_up = upper_now < close <= upper_now * (1 + EXT)
+                out_dn = lower_now * (1 - EXT) <= close < lower_now
+                failed_up = any(post < np.array([lower(x) for x in range(last_piv + 1, n)]) * 0.99) if len(post) else False
+                failed_dn = any(post > np.array([upper(x) for x in range(last_piv + 1, n)]) * 1.01) if len(post) else False
 
-    def fitline(points):
-        xs = np.array([p[0] for p in points], dtype=float)
-        ys = np.array([p[1] for p in points], dtype=float)
-        m, b = np.polyfit(xs, ys, 1)
-        x1, x2 = int(xs.min()), min(n - 1, int(xs.max()) + 6)
-        return (x1, m * x1 + b, x2, m * x2 + b), m, b
+                def bull(name, conf, obj, txt_now, txt_brk, last=last_piv):
+                    if failed_up:
+                        return
+                    if inside and close <= upper_now:
+                        add(name, "bullish", conf, obj, txt_now, two, lbl, "formándose", upper_now, last)
+                    elif out_up:
+                        add(name, "bullish", conf, obj, txt_brk, two, lbl, "ruptura confirmada", upper_now, last)
 
-    if sh is not None and sl is not None and rp and rl:
-        last_piv = max(rp[-1][0], rl[-1][0])
-        if (n - 1 - last_piv) <= RECENT:
-            FLAT, RISE = 0.06, 0.10
-            h_flat, l_flat = abs(sh) < FLAT, abs(sl) < FLAT
-            h_up, l_up = sh > RISE, sl > RISE
-            h_dn, l_dn = sh < -RISE, sl < -RISE
-            Lh, mh, bh = fitline(rp)
-            Ll, ml, bl_ = fitline(rl)
-            upper_now = mh * (n - 1) + bh
-            lower_now = ml * (n - 1) + bl_
-            inside = lower_now * 0.98 <= close <= upper_now * 1.02
-            x0 = min(Lh[0], Ll[0])
-            height = abs((mh * x0 + bh) - (ml * x0 + bl_))
-            two = [Lh, Ll]
-            if inside and h_flat and l_up and reach_ok(upper_now):
-                obj = upper_now + height
-                add("Triángulo ascendente", "bullish", 68, obj,
-                    f"Alcista: romper la resistencia ${upper_now:.2f} proyecta ≈ ${obj:.2f} ({pct(obj):+.1f}%)", two)
-            elif inside and l_flat and h_dn and reach_ok(lower_now):
-                obj = lower_now - height
-                add("Triángulo descendente", "bearish", 68, obj,
-                    f"Bajista: perder el soporte ${lower_now:.2f} proyecta ≈ ${obj:.2f} ({pct(obj):+.1f}%)", two)
-            elif inside and h_dn and l_up:
-                add("Triángulo simétrico", "neutral", 60, None,
-                    f"La ruptura define la dirección; movimiento esperado ≈ ±${height:.2f} ({height/close*100:.1f}%)", two)
-            elif inside and h_up and l_up:
-                if sl > sh * 1.5:
-                    obj = close - height
-                    add("Cuña ascendente", "bearish", 62, obj,
-                        f"Bajista al romper abajo (${lower_now:.2f}): proyección ≈ ${obj:.2f} ({pct(obj):+.1f}%)", two)
-                elif abs(sh - sl) <= max(0.05, 0.35 * abs(sh)):
-                    obj = close + height
-                    add("Canal alcista", "bullish", 65, obj,
-                        f"Canal alcista vigente ({lower_now:.2f}–{upper_now:.2f}); continuar apunta ≈ ${obj:.2f} ({pct(obj):+.1f}%). Perder la base lo anula", two)
-            elif inside and h_dn and l_dn:
-                if abs(sh) > abs(sl) * 1.5:
-                    obj = close + height
-                    add("Cuña descendente", "bullish", 62, obj,
-                        f"Alcista al romper arriba (${upper_now:.2f}): proyección ≈ ${obj:.2f} ({pct(obj):+.1f}%)", two)
-                elif abs(sh - sl) <= max(0.05, 0.35 * abs(sh)):
-                    obj = close - height
-                    add("Canal bajista", "bearish", 65, obj,
-                        f"Canal bajista vigente; continuar apunta ≈ ${obj:.2f} ({pct(obj):+.1f}%). Romper el techo lo anula", two)
-            elif inside and h_flat and l_flat:
-                hi = float(np.mean([p[1] for p in rp])); lo = float(np.mean([p[1] for p in rl]))
-                width = (hi - lo) / close * 100
-                if 3 <= width <= 15:
-                    bull = trend60 > 0
-                    obj = (hi + (hi - lo)) if bull else (lo - (hi - lo))
-                    lvl = hi if bull else lo
-                    add("Rectángulo " + ("alcista" if bull else "bajista"),
-                        "bullish" if bull else "bearish", 58, obj,
-                        (f"Alcista: romper ${lvl:.2f} proyecta ≈ ${obj:.2f}" if bull else
-                         f"Bajista: perder ${lvl:.2f} proyecta ≈ ${obj:.2f}") + f" ({pct(obj):+.1f}%)", two)
+                def bear(name, conf, obj, txt_now, txt_brk, last=last_piv):
+                    if failed_dn:
+                        return
+                    if inside and close >= lower_now:
+                        add(name, "bearish", conf, obj, txt_now, two, lbl, "formándose", lower_now, last)
+                    elif out_dn:
+                        add(name, "bearish", conf, obj, txt_brk, two, lbl, "ruptura confirmada", lower_now, last)
 
-    # ── S/R horizontal: nivel cercano (≤6%) y último toque reciente ──
+                if h_flat and l_up and reach_ok(upper_now):
+                    obj = upper_now + height
+                    bull("Triángulo ascendente", 68, obj,
+                         f"Alcista: romper la resistencia ${upper_now:.2f} proyecta ≈ ${obj:.2f} ({pct(obj):+.1f}%)",
+                         f"Alcista — ruptura confirmada sobre ${upper_now:.2f}; objetivo ≈ ${obj:.2f} ({pct(obj):+.1f}%)")
+                elif l_flat and h_dn and reach_ok(lower_now):
+                    obj = lower_now - height
+                    bear("Triángulo descendente", 68, obj,
+                         f"Bajista: perder el soporte ${lower_now:.2f} proyecta ≈ ${obj:.2f} ({pct(obj):+.1f}%)",
+                         f"Bajista — ruptura confirmada bajo ${lower_now:.2f}; objetivo ≈ ${obj:.2f} ({pct(obj):+.1f}%)")
+                elif h_dn and l_up and inside and not failed_up and not failed_dn:
+                    add("Triángulo simétrico", "neutral", 60, None,
+                        f"La ruptura define la dirección (${lower_now:.2f}–${upper_now:.2f}); movimiento esperado ≈ ±${height:.2f} ({height/close*100:.1f}%)",
+                        two, lbl, "formándose", None, last_piv)
+                elif h_up and l_up:
+                    if sl > sh * 1.5:
+                        obj = close - height
+                        bear("Cuña ascendente", 62, obj,
+                             f"Bajista al romper abajo (${lower_now:.2f}): proyección ≈ ${obj:.2f} ({pct(obj):+.1f}%)",
+                             f"Bajista — perdió la base de la cuña (${lower_now:.2f}); objetivo ≈ ${obj:.2f} ({pct(obj):+.1f}%)")
+                    elif abs(sh - sl) <= max(0.05, 0.35 * abs(sh)) and inside and not failed_up:
+                        obj = close + height
+                        add("Canal alcista", "bullish", 65, obj,
+                            f"Canal alcista vigente ({lower_now:.2f}–{upper_now:.2f}); continuar apunta ≈ ${obj:.2f} ({pct(obj):+.1f}%). Perder la base lo anula",
+                            two, lbl, "formándose", lower_now, last_piv)
+                elif h_dn and l_dn:
+                    if abs(sh) > abs(sl) * 1.5:
+                        obj = close + height
+                        bull("Cuña descendente", 62, obj,
+                             f"Alcista al romper arriba (${upper_now:.2f}): proyección ≈ ${obj:.2f} ({pct(obj):+.1f}%)",
+                             f"Alcista — superó el techo de la cuña (${upper_now:.2f}); objetivo ≈ ${obj:.2f} ({pct(obj):+.1f}%)")
+                    elif abs(sh - sl) <= max(0.05, 0.35 * abs(sh)) and inside and not failed_dn:
+                        obj = close - height
+                        add("Canal bajista", "bearish", 65, obj,
+                            f"Canal bajista vigente; continuar apunta ≈ ${obj:.2f} ({pct(obj):+.1f}%). Romper el techo lo anula",
+                            two, lbl, "formándose", upper_now, last_piv)
+                elif h_flat and l_flat:
+                    hi_, lo_ = upper_now, lower_now
+                    width = (hi_ - lo_) / close * 100
+                    if 3 <= width <= 15:
+                        if trend60 > 0:
+                            obj = hi_ + (hi_ - lo_)
+                            bull("Rectángulo alcista", 58, obj,
+                                 f"Alcista: romper ${hi_:.2f} proyecta ≈ ${obj:.2f} ({pct(obj):+.1f}%)",
+                                 f"Alcista — ruptura confirmada sobre ${hi_:.2f}; objetivo ≈ ${obj:.2f} ({pct(obj):+.1f}%)")
+                        else:
+                            obj = lo_ - (hi_ - lo_)
+                            bear("Rectángulo bajista", 58, obj,
+                                 f"Bajista: perder ${lo_:.2f} proyecta ≈ ${obj:.2f} ({pct(obj):+.1f}%)",
+                                 f"Bajista — ruptura confirmada bajo ${lo_:.2f}; objetivo ≈ ${obj:.2f} ({pct(obj):+.1f}%)")
+
+    # ── S/R horizontal: 3 toques, cercano (≤6%), reciente y sin romper ──
     if len(ph) >= 3:
         last3 = ph[-3:]
         vals = [v for _, v in last3]
         lvl = float(np.mean(vals))
         if (max(vals) - min(vals)) / lvl <= 0.015 and abs(lvl / close - 1) <= 0.06 \
-           and (n - 1 - last3[-1][0]) <= 20:
+           and (n - 1 - last3[-1][0]) <= 20 and float(C[last3[0][0]:].max()) <= lvl * 1.01:
             add("Resistencia horizontal", "neutral", 66, None,
                 f"Resistencia probada 3+ veces en ${lvl:.2f} (a {abs(lvl/close-1)*100:.1f}% del precio): romperla con volumen abre continuación",
-                [(last3[0][0], lvl, min(n - 1, last3[-1][0] + 6), lvl)])
+                [(last3[0][0], lvl, n - 1, lvl)], ["resistencia"], "formándose", lvl, last3[-1][0])
     if len(pl) >= 3:
         last3 = pl[-3:]
         vals = [v for _, v in last3]
         lvl = float(np.mean(vals))
         if (max(vals) - min(vals)) / lvl <= 0.015 and abs(lvl / close - 1) <= 0.06 \
-           and (n - 1 - last3[-1][0]) <= 20:
+           and (n - 1 - last3[-1][0]) <= 20 and float(C[last3[0][0]:].min()) >= lvl * 0.99:
             add("Soporte horizontal", "neutral", 66, None,
                 f"Soporte probado 3+ veces en ${lvl:.2f}: perderlo con volumen abre caída",
-                [(last3[0][0], lvl, min(n - 1, last3[-1][0] + 6), lvl)])
+                [(last3[0][0], lvl, n - 1, lvl)], ["soporte"], "formándose", lvl, last3[-1][0])
 
     # ── Banderas/banderines (recientes por construcción) ──
     for cons in range(6, 16):
         if n < cons + 20:
             break
-        seg = c.iloc[-cons:]
+        seg = C[-cons:]
         rng = (float(seg.max()) - float(seg.min())) / close * 100
-        pole = (float(c.iloc[-cons - 1]) / float(c.iloc[-cons - 13]) - 1) * 100 if n >= cons + 14 else 0
+        pole = (float(C[-cons - 1]) / float(C[-cons - 13]) - 1) * 100 if n >= cons + 14 else 0
         if rng <= 6:
             half = cons // 2
-            r1 = float(seg.iloc[:half].max()) - float(seg.iloc[:half].min())
-            r2 = float(seg.iloc[half:].max()) - float(seg.iloc[half:].min())
+            r1 = float(seg[:half].max()) - float(seg[:half].min())
+            r2 = float(seg[half:].max()) - float(seg[half:].min())
             shape = "Banderín" if r2 < r1 * 0.65 else "Bandera"
             x1, x2 = n - cons, n - 1
-            box = [(x1, float(seg.max()), x2, float(seg.iloc[half:].max()) if shape == "Banderín" else float(seg.max())),
-                   (x1, float(seg.min()), x2, float(seg.iloc[half:].min()) if shape == "Banderín" else float(seg.min()))]
+            # El rango se mide en cierres (criterio original), pero la caja se dibuja
+            # sobre máximos/mínimos para que ninguna mecha la atraviese.
+            sh, sl = Hh[-cons:], Ll[-cons:]
+            if shape == "Banderín":
+                a = int(sh.argmax()); b = int(sl.argmin())
+                mu = max([(float(sh[j]) - float(sh[a])) / (j - a) for j in range(a + 1, cons)] or [0.0])
+                ml = min([(float(sl[j]) - float(sl[b])) / (j - b) for j in range(b + 1, cons)] or [0.0])
+                up0, up1 = float(sh[a]) - mu * a, float(sh[a]) + mu * (cons - 1 - a)
+                lo0, lo1 = float(sl[b]) - ml * b, float(sl[b]) + ml * (cons - 1 - b)
+                if mu > 0:   # tramo previo al máximo: que tampoco lo cruce
+                    up0 = max(up0, float(sh[:a + 1].max())); up1 = max(up1, up0)
+                if ml < 0:
+                    lo0 = min(lo0, float(sl[:b + 1].min())); lo1 = min(lo1, lo0)
+            else:
+                up0 = up1 = float(sh.max()); lo0 = lo1 = float(sl.min())
+            box = [(x1, up0, x2, up1), (x1, lo0, x2, lo1)]
             pole_abs = abs(pole) / 100 * close
+            pl_line = (max(0, x1 - 13), float(C[max(0, x1 - 13)]), x1, float(C[x1]))
             if pole >= 12:
                 obj = close + pole_abs
                 add(shape + " alcista", "bullish", 64, obj,
                     f"Continuación alcista: mástil de {pole:.0f}% proyectado ≈ ${obj:.2f} ({pct(obj):+.1f}%)",
-                    box + [(max(0, x1 - 13), float(c.iloc[max(0, x1 - 13)]), x1, float(c.iloc[x1]))])
+                    box + [pl_line], ["techo", "piso", "mástil"], "formándose", box[0][3], n - 1)
                 break
             if pole <= -12:
                 obj = close - pole_abs
                 add(shape + " bajista", "bearish", 64, obj,
                     f"Continuación bajista: mástil de {pole:.0f}% proyectado ≈ ${obj:.2f} ({pct(obj):+.1f}%)",
-                    box + [(max(0, x1 - 13), float(c.iloc[max(0, x1 - 13)]), x1, float(c.iloc[x1]))])
+                    box + [pl_line], ["techo", "piso", "mástil"], "formándose", box[1][3], n - 1)
                 break
 
     # ── Taza con asa: borde al alcance y sin extenderse ──
@@ -552,26 +693,53 @@ def detect_patterns(hist, lookback=140):
         for span in (60, 80, 100):
             if n < span + 8:
                 continue
-            cup = c.iloc[-span - 8:-8]
-            rim_l = float(cup.iloc[:8].max()); rim_r = float(cup.iloc[-8:].max())
-            bot = float(cup.min()); bot_pos = int(cup.values.argmin()) / len(cup)
+            x1 = n - span - 8
+            cup = C[x1:n - 8]
+            xl = x1 + int(cup[:8].argmax()); rim_l = float(cup[:8].max())
+            xr = x1 + len(cup) - 8 + int(cup[-8:].argmax()); rim_r = float(cup[-8:].max())
+            xb = x1 + int(cup.argmin()); bot = float(cup.min()); bot_pos = (xb - x1) / len(cup)
             depth = (min(rim_l, rim_r) - bot) / min(rim_l, rim_r) * 100
-            handle = c.iloc[-8:]
+            handle = C[-8:]
             h_pull = (rim_r - float(handle.min())) / rim_r * 100
+            pre = C[max(0, xl - 40):xl + 1]
+            prior_up = len(pre) >= 10 and rim_l / float(pre.min()) - 1 >= 0.15     # continuación: subida previa ≥15%
+            dmin = bot + (min(rim_l, rim_r) - bot) * 0.25
+            rounded = (cup <= dmin).mean() >= 0.15                                    # fondo en "U", no en "V"
+            handle_hi = float(handle.min()) >= bot + (rim_r - bot) * 0.5             # asa en la mitad superior
+            mid = cup[int(len(cup) * 0.2):int(len(cup) * 0.8)]
+            rounded = rounded and float(mid.max()) <= bot + (min(rim_l, rim_r) - bot) * 0.6   # sin rebotes hasta el borde a mitad de taza
             if abs(rim_l - rim_r) / rim_r <= 0.05 and 10 <= depth <= 35 \
-               and 0.25 <= bot_pos <= 0.75 and 0 < h_pull <= 8 \
+               and 0.25 <= bot_pos <= 0.75 and 0 < h_pull <= 8 and prior_up and rounded and handle_hi \
                and rim_r * 0.94 <= close <= rim_r * (1 + EXT) and reach_ok(rim_r):
                 obj = rim_r + (rim_r - bot)
-                x1 = n - span - 8
+                broke = close > rim_r
                 add("Taza con asa", "bullish", 66, obj,
-                    f"Alcista: romper el borde ${rim_r:.2f} proyecta ≈ ${obj:.2f} ({pct(obj):+.1f}%)",
-                    [(x1, rim_l, n - 1, rim_r)])
+                    (f"Alcista — ruptura confirmada sobre el borde ${rim_r:.2f}; objetivo ≈ ${obj:.2f} ({pct(obj):+.1f}%)" if broke else
+                     f"Alcista: romper el borde ${rim_r:.2f} proyecta ≈ ${obj:.2f} ({pct(obj):+.1f}%)"),
+                    [(xl, rim_l, (xl + xb) // 2, bot + (rim_l - bot) * 0.25), ((xl + xb) // 2, bot + (rim_l - bot) * 0.25, xb, bot),
+                     (xb, bot, (xb + xr) // 2, bot + (rim_r - bot) * 0.25), ((xb + xr) // 2, bot + (rim_r - bot) * 0.25, xr, rim_r),
+                     (xr, rim_r, n - 1, rim_r)], ["", "", "", "taza", "borde"],
+                    "ruptura confirmada" if broke else "formándose", rim_r, n - 1)
                 break
 
+    # ── Sin contradicciones: si hay alcistas y bajistas, gana la más reciente ──
+    dirs = {p["tipo"] for p in found if p["tipo"] != "neutral"}
+    if len(dirs) > 1:
+        lead = max((p for p in found if p["tipo"] != "neutral"), key=lambda p: (p["_last"], p["conf"]))
+        found = [p for p in found if p["tipo"] in ("neutral", lead["tipo"])]
+    # ── Sin duplicados: un soporte/resistencia horizontal al mismo nivel de los
+    #    techos/suelos de una figura de giro ya está dentro de esa figura ──
+    giro = [p for p in found if p["name"] in ("Doble techo", "Triple techo", "Doble suelo", "Triple suelo")]
+    def _dup(p):
+        if p["name"] not in ("Resistencia horizontal", "Soporte horizontal"):
+            return False
+        lvl = p["lines"][0][1]
+        return any(abs(q["lines"][0][1] / lvl - 1) <= 0.015 or abs(q["lines"][-2][3] / lvl - 1) <= 0.015 for q in giro)
+    found = [p for p in found if not _dup(p)]
     seen, out = set(), []
     for p in sorted(found, key=lambda x: -x["conf"]):
         if p["name"] not in seen:
-            seen.add(p["name"]); out.append(p)
+            seen.add(p["name"]); p.pop("_last", None); out.append(p)
     return out[:3]
 
 def detect_signals(hist, rsi_v, rel_vol, close, hi52, lo52, sma50v, sma200v, daily):
@@ -1626,12 +1794,26 @@ def get_stock_data(ticker, spy_close=None):
             scr_patterns = detect_patterns(hist)
         except Exception:
             scr_patterns = []
-        pat_c = None
+        pat_c, pat_h, pat_l = None, None, None
         if scr_patterns:
             try:
                 pat_c = [round(float(x), 2) for x in scr_c.tail(140).values]
             except Exception:
                 pat_c = None
+            try:
+                # Máximos y mínimos de las mismas velas, en milésimas (0,1 %) sobre el
+                # cierre (compacto): el gráfico del Screener dibuja las mechas y las
+                # líneas de la figura (que se trazan sobre máximos/mínimos) encajan.
+                def _pm(x, c):   # |x/c − 1| en milésimas; 0 si falta el dato
+                    x, c = float(x), float(c)
+                    if not (np.isfinite(x) and np.isfinite(c)) or c <= 0:
+                        return 0
+                    return int(round(abs(x / c - 1) * 1000))
+                _t = hist.tail(140)
+                pat_h = [_pm(h, c) for h, c in zip(_t["High"].values, _t["Close"].values)]
+                pat_l = [_pm(l, c) for l, c in zip(_t["Low"].values, _t["Close"].values)]
+            except Exception:
+                pat_h = pat_l = None
 
         pe_gr, pe_pts = grade_pe(pe)
         roe_gr, roe_pts = grade_roe(roe)
@@ -1695,7 +1877,7 @@ def get_stock_data(ticker, spy_close=None):
             "from_hi52": from_hi52, "from_lo52": from_lo52,
             "sma50_rel": sma50_rel, "sma200_rel": sma200_rel,
             "asof": asof,
-            "signals": scr_signals, "patterns": scr_patterns, "pat_c": pat_c,
+            "signals": scr_signals, "patterns": scr_patterns, "pat_c": pat_c, "pat_h": pat_h, "pat_l": pat_l,
             "sma20_rel": sma20_rel, "from_hi50": from_hi50, "from_lo50": from_lo50,
             "gap": gap_v, "chg_open": chg_open, "vol_w": vol_w, "vol_m": vol_m,
             "avg_vol_m": avg_vol, "mktcap_b": round(mktcap / 1e9, 2) if mktcap else None,

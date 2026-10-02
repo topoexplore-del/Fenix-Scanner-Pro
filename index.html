@@ -463,7 +463,7 @@ window.renderScreener=function(){
       var clickable=r.pat_c?' cursor:pointer;':'';
       return '<span style="display:inline-block;margin:1px;padding:1px 5px;border-radius:3px;border:1px solid '+col+';color:'+col+';font-size:9px;'+clickable+'" '
         +(r.pat_c?'onclick="event.stopPropagation();togglePatChart(\''+r.ticker+'\','+pi+',this)" ':'')
-        +'title="confianza '+p.conf+'%'+(r.pat_c?' — clic para ver el dibujo':'')+'">'+p.icon+" "+p.name+"</span>"}).join("");
+        +'title="'+(p.estado?p.estado+' · ':'')+'puntaje '+p.conf+' (fijo por tipo de figura, no es probabilidad)'+(r.pat_c?' — clic para ver el dibujo':'')+'">'+p.icon+" "+p.name+(p.estado==="ruptura confirmada"?" ✓":"")+"</span>"}).join("");
     var p0=(r.patterns||[])[0],escCell="—";
     if(p0){
       var col0=p0.tipo==="bullish"?"var(--green)":p0.tipo==="bearish"?"var(--red)":"var(--amber)";
@@ -493,29 +493,65 @@ window.renderScreener=function(){
 };
 
 // ── Dibujo del patrón: SVG con la serie de cierres + las líneas detectadas ──
-window.patChartSvg=function(r,hiIdx){
+// FENIX: dibujo auditado — mechas (máx/mín) + cierre, solo la figura elegida, etiquetas,
+// objetivo siempre visible (o flecha si queda fuera de escala) y punto del precio de hoy.
+window.patChartSvg=function(r,hiIdx,W,H){
   var c=r.pat_c;if(!c||c.length<10)return"";
-  var n=c.length,W=680,H=170,PAD=6;
-  var ys=c.slice();
-  (r.patterns||[]).forEach(function(p){(p.lines||[]).forEach(function(L){ys.push(L[1],L[3])})});
-  var mn=Math.min.apply(null,ys),mx=Math.max.apply(null,ys),rg=Math.max(1e-9,mx-mn);
-  function X(i){return PAD+i/(n-1)*(W-2*PAD)}
-  function Y(v){return H-PAD-(v-mn)/rg*(H-2*PAD)}
-  var pts=c.map(function(v,i){return X(i).toFixed(1)+","+Y(v).toFixed(1)}).join(" ");
-  var s='<svg viewBox="0 0 '+W+' '+H+'" style="width:100%;max-width:'+W+'px;height:'+H+'px;display:block;background:var(--bg);border-radius:6px">';
-  s+='<polyline points="'+pts+'" fill="none" stroke="var(--txt3)" stroke-width="1.4"/>';
-  (r.patterns||[]).forEach(function(p,pi){
-    var col=p.tipo==="bullish"?"var(--green)":p.tipo==="bearish"?"var(--red)":"var(--amber)";
-    var wdt=pi===hiIdx?2.4:1.2,op=pi===hiIdx?1:0.45;
+  W=W||680;H=H||190;
+  var n=c.length,PAD=6,TOP=16;
+  var hi=c.map(function(v,i){return r.pat_h&&r.pat_h[i]!=null?v*(1+r.pat_h[i]/1e3):v});
+  var lo=c.map(function(v,i){return r.pat_l&&r.pat_l[i]!=null?v*(1-r.pat_l[i]/1e3):v});
+  var pats=r.patterns||[],p=pats[hiIdx]||pats[0];
+  var ys=hi.concat(lo);
+  if(p)(p.lines||[]).forEach(function(L){ys.push(L[1],L[3])});
+  var mn=Math.min.apply(null,ys),mx=Math.max.apply(null,ys),objIn=false;
+  if(p&&p.obj!=null){var sp=mx-mn;if(p.obj<=mx+sp*0.6&&p.obj>=mn-sp*0.6){mn=Math.min(mn,p.obj);mx=Math.max(mx,p.obj);objIn=true}}
+  var rg=Math.max(1e-9,mx-mn);mn-=rg*0.04;mx+=rg*0.04;rg=mx-mn;
+  // textos del margen derecho (niveles vigentes y objetivo): el margen se ajusta al más largo
+  var LV={"cuello":1,"resistencia":1,"soporte":1,"borde":1,"techo":1,"piso":1};
+  var RL=[],ML=[],offs=null;
+  if(p){
+    (p.lines||[]).forEach(function(L,k){var lb=(p.labels||[])[k];if(!lb)return;
+      if(L[2]>=n-2)RL.push({v:L[3],t:lb+(LV[lb]?" $"+L[3].toFixed(2):"")});else ML.push({L:L,t:lb})});
+    if(p.obj!=null){if(objIn)RL.push({v:p.obj,t:"obj $"+p.obj});
+      else offs=(p.obj>mx?"▲":"▼")+" obj $"+p.obj+(W>500?" (fuera de escala)":" (fuera)")}
+  }
+  var mc=0;RL.forEach(function(o){mc=Math.max(mc,o.t.length)});
+  var RP=Math.max(W>500?70:56,Math.min(150,10+mc*5.6));
+  function X(i){return PAD+i/(n-1)*(W-PAD-RP)}
+  function Y(v){return H-PAD-(v-mn)/rg*(H-PAD-TOP)}
+  function f(v){return v.toFixed(1)}
+  var s='<svg viewBox="0 0 '+W+' '+H+'" style="width:100%;max-width:'+W+'px;height:auto;display:block;background:var(--bg);border-radius:6px">';
+  if(r.pat_h&&r.pat_l)for(var i=0;i<n;i++)s+='<line x1="'+f(X(i))+'" y1="'+f(Y(hi[i]))+'" x2="'+f(X(i))+'" y2="'+f(Y(lo[i]))+'" stroke="#555a66" stroke-width="1" opacity="0.7"/>';
+  s+='<polyline points="'+c.map(function(v,i){return f(X(i))+","+f(Y(v))}).join(" ")+'" fill="none" stroke="#c8cad0" stroke-width="1.3"/>';
+  if(p){
+    var col=p.tipo==="bullish"?"#00e676":p.tipo==="bearish"?"#ff5252":"#ffab00";
     (p.lines||[]).forEach(function(L){
-      s+='<line x1="'+X(L[0]).toFixed(1)+'" y1="'+Y(L[1]).toFixed(1)+'" x2="'+X(L[2]).toFixed(1)+'" y2="'+Y(L[3]).toFixed(1)+'" stroke="'+col+'" stroke-width="'+wdt+'" opacity="'+op+'" stroke-dasharray="'+(p.obj!=null?'':'4,3')+'"/>';
+      s+='<line x1="'+f(X(L[0]))+'" y1="'+f(Y(L[1]))+'" x2="'+f(X(L[2]))+'" y2="'+f(Y(L[3]))+'" stroke="'+col+'" stroke-width="2.2"'+(p.obj==null?' stroke-dasharray="5,3"':'')+'/>';
     });
-    if(pi===hiIdx&&p.obj!=null){
-      s+='<line x1="'+PAD+'" y1="'+Y(p.obj).toFixed(1)+'" x2="'+(W-PAD)+'" y2="'+Y(p.obj).toFixed(1)+'" stroke="'+col+'" stroke-width="1" stroke-dasharray="2,4" opacity="0.8"/>';
-      s+='<text x="'+(W-PAD-4)+'" y="'+(Y(p.obj)-4).toFixed(1)+'" fill="'+col+'" font-size="10" text-anchor="end" font-family="monospace">obj $'+p.obj+'</text>';
-    }
-  });
-  s+='<text x="'+(PAD+2)+'" y="12" fill="var(--txt3)" font-size="9" font-family="monospace">'+r.ticker+' · últimas '+n+' velas (cierres)</text>';
+    if(objIn)s+='<line x1="'+PAD+'" y1="'+f(Y(p.obj))+'" x2="'+f(X(n-1))+'" y2="'+f(Y(p.obj))+'" stroke="'+col+'" stroke-width="1" stroke-dasharray="2,4" opacity="0.85"/>';
+    // etiquetas de tramos (techos, suelos, hombros, mástil): centradas, por encima en
+    // figuras bajistas y por debajo en alcistas, para no tapar el precio
+    ML.forEach(function(o){var L=o.L,below=p.tipo==="bullish";
+      var yy=below?Math.max(Y(L[1]),Y(L[3]))+11:Math.min(Y(L[1]),Y(L[3]))-4;
+      // "cabeza" va sobre el punto extremo del tramo (la cabeza), el resto al centro
+      var xx=(X(L[0])+X(L[2]))/2;
+      if(o.t==="cabeza")xx=((below?L[1]<L[3]:L[1]>L[3])?X(L[0]):X(L[2]));
+      yy=Math.min(H-3,Math.max(TOP+8,yy));
+      s+='<text x="'+f(xx)+'" y="'+f(yy)+'" fill="'+col+'" font-size="9" text-anchor="middle" font-family="monospace">'+o.t+'</text>'});
+    if(offs)s+='<text x="'+(W-4)+'" y="11" fill="'+col+'" font-size="9" text-anchor="end" font-family="monospace">'+offs+'</text>';
+    // margen derecho sin encimarse (mínimo 10 px entre textos)
+    RL.forEach(function(o){o.y=Y(o.v)+3});
+    RL.sort(function(a,b){return a.y-b.y});
+    for(var q=1;q<RL.length;q++)if(RL[q].y-RL[q-1].y<10)RL[q].y=RL[q-1].y+10;
+    if(RL.length&&RL[RL.length-1].y>H-2){RL[RL.length-1].y=H-2;
+      for(q=RL.length-2;q>=0;q--)if(RL[q+1].y-RL[q].y<10)RL[q].y=RL[q+1].y-10}
+    RL.forEach(function(o){s+='<text x="'+f(X(n-1)+5)+'" y="'+f(Math.max(TOP+6,o.y))+'" fill="'+col+'" font-size="9" font-family="monospace">'+o.t+'</text>'});
+  }
+  var lc=c[n-1];
+  s+='<circle cx="'+f(X(n-1))+'" cy="'+f(Y(lc))+'" r="3.2" fill="#ffffff"/>';
+  var ttl=W>500?r.ticker+' · últimas '+n+' velas · línea = cierre'+(r.pat_h?' · barras = máximo/mínimo':'')+' · ● hoy $'+lc:r.ticker+' · '+n+' velas · ● hoy $'+lc;
+  s+='<text x="'+(PAD+2)+'" y="11" fill="#8a8c96" font-size="9" font-family="monospace">'+ttl+'</text>';
   return s+"</svg>";
 };
 window.togglePatChart=function(tk,pi,el){
@@ -526,8 +562,8 @@ window.togglePatChart=function(tk,pi,el){
   var p=(r.patterns||[])[pi];
   var nrow=document.createElement("tr");
   nrow.setAttribute("data-patchart",tk);nrow.setAttribute("data-pi",pi);
-  nrow.innerHTML='<td colspan="11" style="padding:8px 12px;background:var(--bg2)">'+window.patChartSvg(r,pi)
-    +(p&&p.esc?'<p style="margin:6px 2px 0;color:var(--txt2);font-size:10px">'+p.icon+' <b>'+p.name+'</b> ('+p.conf+'% conf): '+p.esc+' · <i style="color:var(--txt3)">Proyección técnica clásica, no garantía — confirma la ruptura con volumen.</i></p>':"")+"</td>";
+  nrow.innerHTML='<td colspan="11" style="padding:8px 12px;background:var(--bg2)">'+window.patChartSvg(r,pi,Math.max(680,Math.min(1100,(tr.offsetWidth||900)-40)),220)
+    +(p&&p.esc?'<p style="margin:6px 2px 0;color:var(--txt2);font-size:10px">'+p.icon+' <b>'+p.name+'</b>'+(p.estado?' <span style="padding:1px 6px;border-radius:8px;border:1px solid var(--border2);color:'+(p.estado==="ruptura confirmada"?"var(--cyan)":"var(--txt2)")+'">'+p.estado+'</span>':'')+' <span style="color:var(--txt3)" title="Puntaje fijo del tipo de figura en el catálogo; NO es una probabilidad">(puntaje '+p.conf+')</span>: '+p.esc+' · <i style="color:var(--txt3)">Proyección técnica clásica, no garantía — confirma la ruptura con volumen.</i></p>':"")+"</td>";
   tr.parentNode.insertBefore(nrow,tr.nextSibling);
 };
 

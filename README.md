@@ -11,8 +11,10 @@ todos los datos. No tiene relación con Alba.
 | Documento | Para qué |
 |---|---|
 | **[AUDITORIA_FENIX.md](AUDITORIA_FENIX.md)** | Por qué AndFig no generaba todos los datos, qué se corrigió y cómo se validó |
+| **[AUDITORIA_PATRONES.md](AUDITORIA_PATRONES.md)** | 📐 Patrones del Screener: qué se detectaba y dibujaba mal, qué se corrigió y qué tan útiles son |
 | **[MANUAL_SEGUIMIENTO.md](MANUAL_SEGUIMIENTO.md)** | Botón ⬇ Seguimiento Excel/CSV (tu hoja SEGUIMIENTO, columnas A → AY) |
 | **[MANUAL_LISTADO.md](MANUAL_LISTADO.md)** | 🌐 Listado completo: ~9.600 activos adicionales evaluados cada noche con la misma lógica |
+| **[MANUAL_COMBOS.md](MANUAL_COMBOS.md)** | 🧩 COMBOS y ✅ WIN%DIA: los combos 3, 11, 12, 14, 15 y 16 medidos cada día sobre todo el universo |
 | **[MANUAL_INSTALACION.md](MANUAL_INSTALACION.md)** | Instalación paso a paso (GitHub Pages + Actions) |
 | [MANUAL_USO.md](MANUAL_USO.md) · [MANUAL_NIVEL_PRO.md](MANUAL_NIVEL_PRO.md) · [MANUAL_SCREENER.md](MANUAL_SCREENER.md) · [MANUAL_APP_IPHONE.md](MANUAL_APP_IPHONE.md) | Uso del sistema (sin cambios respecto a AndFig) |
 
@@ -28,7 +30,7 @@ todos los datos. No tiene relación con Alba.
 | Pestañas calculadas con valores por defecto en filas sin precio | Esas filas no se usan |
 | Solo ~1.170 activos (tus grupos) | **🌐 Listado completo:** los 11.525 del LISTADO menos ~800 ETF apalancados/inversos, con la misma lógica y las mismas 4 capas de alertas |
 | Telegram rechazaba el mensaje con más de ~6 señales (límite de 4.096 caracteres) | Se envía en varias partes |
-| — | **⬇ Seguimiento Excel/CSV** en el Historial y 🩺 indicador de salud del dato |
+| — | **⬇ Seguimiento Excel/CSV** en el Historial (distancias EMA medidas en el fill, como tu script de TradingView) y 🩺 indicador de salud del dato |
 
 ## Inicio rápido
 

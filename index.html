@@ -226,6 +226,9 @@ table.an-table tr:hover{background:var(--bg3)}
   <button class="tab-btn" data-tab="alerthistory" onclick="switchTab('alerthistory',this)">📋 Historial</button>
   <button class="tab-btn" data-tab="markov" onclick="switchTab('markov',this)">🔗 Markov</button>
   <button class="tab-btn" data-tab="laplace" onclick="switchTab('laplace',this)">🌊 Laplace</button>
+  <div class="tab-div"></div>
+  <button class="tab-btn" data-tab="combos" onclick="switchTab('combos',this)" title="Combos 3, 11, 12, 14, 15 y 16 del informe sobre todo el universo">🧩 COMBOS</button>
+  <button class="tab-btn" data-tab="windia" onclick="switchTab('windia',this)" title="Tickets con rendimiento positivo del día y todos sus parámetros">✅ WIN%DIA</button>
 </div>
 <div class="tab-view active" id="view-radar">
   <div class="alerts" id="alerts-bar"><span class="alerts-label">🚨 Signals</span></div>
@@ -330,6 +333,14 @@ table.an-table tr:hover{background:var(--bg3)}
   <span style="margin-left:auto;color:var(--txt3);font-size:10px" id="lp-count"></span></div>
   <div class="an-view" id="lp-content"></div>
 </div>
+<div class="tab-view" id="view-combos">
+  <div class="an-controls" id="cb-controls" style="gap:8px"></div>
+  <div class="an-view" id="cb-content"></div>
+</div>
+<div class="tab-view" id="view-windia">
+  <div class="an-controls" id="wd-controls" style="gap:8px"></div>
+  <div class="an-view" id="wd-content"></div>
+</div>
 <div class="footer">
   <span><kbd>↑</kbd><kbd>↓</kbd> Nav</span><span><kbd>M</kbd> Multi</span><span><kbd>1-6</kbd> Tabs</span>
   <span style="margin-left:auto">LONG ONLY · Real-time · Anti-repaint · Yahoo Finance · TradingView</span>
@@ -365,6 +376,7 @@ window.switchTab=function(t,b){
   if(t==="alerthistory")renderAlertHistory();
   if(t==="markov")renderMarkov();
   if(t==="laplace")renderLaplace();
+  if((t==="combos"||t==="windia")&&window.FenixCombosUI)window.FenixCombosUI.render(t);
 };
 
 // ═══ SCREENER (estilo Finviz): Order by + Signal + Patrones ═══
@@ -2936,5 +2948,9 @@ setInterval(function(){
 },1000);
 })();
 </script>
+<!-- COMBOS y WIN%DIA: módulos independientes; leen data/combos_*.json -->
+<script src="fenix_params.js" data-src="fenix_params.js"></script>
+<script src="fenix_combos.js"></script>
+<script src="fenix_combos_ui.js"></script>
 </body>
 </html>

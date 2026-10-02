@@ -167,6 +167,13 @@ jobs:
         env:
           TZ: America/New_York
 
+      - name: COMBOS y WIN%DIA (universo completo; no detiene la actualización si falla)
+        continue-on-error: true
+        run: node scripts/combos.js
+        env:
+          TZ: America/New_York
+          COMBOS_EMA5_MIN: '12'
+
       - name: Guarda de tamaño (límite GitHub 100MB)
         run: |
           FAIL=0

@@ -141,7 +141,84 @@ De paso se corrigió un fallo de AndFig que con más señales sería frecuente:
 las señales en uno solo (con más de ~6 señales no llegaba nada). Ahora se divide
 en varias partes.
 
-## 5. Lo que queda igual a propósito
+### Corrección del 1 de octubre: distancias a las EMA en el fill
+
+La primera versión del Excel medía las distancias EMA **al cierre del día de la
+señal**. Lo correcto, según tu método, es medirlas **en el fill**: el primer
+encuentro del precio con el nivel de entrada el día del fill, en cada
+temporalidad, con la EMA de esa vela. Fenix ahora replica tu script "Nivel →
+EMAs + POC (v3)" (toque, gap de apertura, gap intradía o aproximación), deja vacías
+las alertas sin fill y agrega al Excel una hoja de verificación con la misma
+tabla del script. Ejemplo ASC (señal 30/09, fill 01/10 a 18,48): el Excel anterior
+daba 5 min −0,01 / −0,18 (cierre del 30/09); tu script marca +0,16 / −0,01 en el
+toque de las 09:30, y ese es el punto que ahora mide Fenix.
+
+## 5. Auditoría de los patrones del Screener (1 de octubre)
+
+Los patrones chartistas del Screener se detectaban y dibujaban con errores (líneas que el precio atravesaba, figuras alcistas y bajistas a la vez en el mismo activo, figuras de giro sin tendencia que revertir, cuellos fuera de su sitio, objetivo fuera del gráfico). Se corrigieron el detector y el dibujo. Los patrones **no intervienen** en el Score, el AI, los estados ni las alertas, así que la lógica de señales de AndFig sigue intacta. Detalle, cifras y ejemplos en `AUDITORIA_PATRONES.md`.
+
+## 6. Correcciones del 2 de octubre
+
+**Parámetros de las pestañas: del día del fill.** El Excel traía Hessian, Markov,
+Game Theory, Entry Zones, Analysis y Laplace del día en que apareció la señal.
+Como en Fenix el fill solo cuenta desde la sesión siguiente, esos valores no
+coincidían con lo que muestran las pestañas la noche del fill. Ahora salen de la
+fila del snapshot del día del fill; sin fill quedan vacíos, igual que las
+distancias EMA. Comprobado con los fills del 01/10 sobre los datos reales: 54
+valores comparados contra las pestañas, 54 iguales. De las 284 alertas con fill,
+270 quedan con el dato; 14 tuvieron el fill en noches en que AndFig publicó el
+snapshot sin precios. Detalle en `MANUAL_SEGUIMIENTO.md`.
+
+**Pocas señales del listado completo.** El listado sí se evalúa completo cada
+noche (9.281 activos el 01/10, 163 de ellos en ENTRY/ENTRY+), pero solo dio una
+señal. Causa: los fundamentales se pedían a Yahoo con 4 consultas simultáneas y
+Yahoo bloqueó la máquina tras unas 600; los candidatos del día, que se
+consultaban al final, quedaron sin datos (solo 18 de 163 los tenían) y sin
+fundamentales no se pueden pasar las capas Analysis ni Game Theory. Ahora los
+candidatos se consultan primero, de a uno, con pausas y reintentos, y un bloqueo
+ya no se confunde con "activo sin datos". Además se sube el tope de velas
+reconstruidas: el 01/10 GitHub arrancó la corrida programada hacia las 23:52 UTC
+(más de 2,5 horas tarde), pasó la medianoche UTC, y 694 activos del listado
+quedaron sin la vela del día y no se evaluaron. Detalle en `MANUAL_LISTADO.md`.
+
+## 7. COMBOS y WIN%DIA (2 de octubre)
+
+Dos pestañas nuevas que evalúan cada día, sobre todo el universo (tus grupos + el
+listado completo), los combos 3, 11, 12, 14, 15 y 16 del informe de auditoría del
+Excel. Detalle en [MANUAL_COMBOS.md](MANUAL_COMBOS.md).
+
+**Qué se añadió.** `fenix_combos.js` (motor), `fenix_combos_ui.js` (pestañas),
+`scripts/combos.js` y `scripts/combos_ema5.py` (proceso de cada actualización), un paso
+en `refresh_data.yml` y cuatro cambios en `index.html` (dos botones, dos vistas, una
+línea en el cambio de pestaña y tres etiquetas de script). Ningún archivo de datos
+existente se modifica.
+
+**Hallazgo de la auditoría previa.** El listado completo no incluye los 1.133 tickets
+de tus grupos: el universo real son las dos fuentes juntas (10.414 tickets el 01/10).
+De los 117 tickets con alertas, 116 están en tus grupos.
+
+**Comprobaciones hechas:**
+
+| Prueba | Resultado |
+|---|---|
+| El motor, sobre las 322 filas de tu Excel, reproduce las muestras del punto 8 | 6 de 6 combos iguales (37, 17, 14, 8, 9 y 9 cerradas) |
+| Combo 12 frente a tu columna PATRON 1 = ENTRAR | 322 filas, 0 diferencias |
+| Parámetros de COMBOS frente al Excel de Seguimiento (mismos tickets y días) | 279 valores, 0 diferencias |
+| Combos de cada ticket, recalculados con un programa independiente | 10.484 + 10.414 tickets, 0 diferencias |
+| Estadísticas y Calidad por combo, recalculadas aparte | iguales |
+| Evaluados + excluidos = universo | 9.699 + 709 + 4 + 2 = 10.414 |
+| Tickets duplicados | ninguno |
+| Cierre anterior coherente con el % diario | 100 % de los tickets |
+| Pantalla frente a servidor, y filtros (combo, resultado, sector, ticket, universo) | iguales |
+| Archivos de datos existentes antes y después de correr | sin cambios |
+| Errores de JavaScript al recorrer todas las pestañas | ninguno |
+
+**Lo que no se pudo probar aquí.** La descarga real de velas de 5 minutos de Yahoo
+(combo 15): el cálculo se probó con velas simuladas y coincide con la EMA hecha a mano.
+La mecánica de varios días (rotación, sesión saltada, noche sin listado) se probó con
+sesiones simuladas; con datos reales solo existe el par 30/09 → 01/10.
+
+## 8. Lo que queda igual a propósito
 
 - Todas las reglas de señal y de alertas de AndFig (4 capas, zonas ATR, régimen,
   blackout de earnings, deduplicación).

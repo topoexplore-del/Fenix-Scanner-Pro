@@ -6,7 +6,10 @@
  * Usa fenix_params.js: exactamente las mismas fórmulas que el botón de
  * descarga del Historial y que las pestañas del dashboard.
  *
- * Uso: node scripts/seguimiento_export.js [--dia AAAA-MM-DD] [--modo senales|movimientos|todo]
+ * Los parámetros de las pestañas son los del DÍA DEL FILL (sin fill → vacíos).
+ *
+ * Uso: node scripts/seguimiento_export.js [--dia AAAA-MM-DD] [--modo fills|senales|movimientos|todo]
+ *                                         [--param fill|senal]
  */
 const fs = require("fs");
 const path = require("path");
@@ -24,7 +27,7 @@ const hist = load("alerts_history.json", { alerts: [] });
 const seg = load("seguimiento.json", { rows: {} });
 const mode = arg("--modo", "todo");
 const day = arg("--dia", null);
-const table = F.buildTable(hist, seg, mode, day);
+const table = F.buildTable(hist, seg, mode, day, { paramDia: arg("--param", "fill") });
 fs.writeFileSync(path.join(BASE, "data", "seguimiento.csv"), F.toCSV(table, "std"));
 fs.writeFileSync(path.join(BASE, "data", "seguimiento_es.csv"), F.toCSV(table, "es"));
 const withParams = table.filter(r => r[F.COLUMNS.findIndex(c => c[0] === "mk_score")] != null).length;

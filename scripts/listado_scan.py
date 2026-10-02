@@ -12,10 +12,16 @@ Diferencias SOLO en cómo se obtienen los datos (no en cómo se calculan):
     faltante que build_data.py.
   · Fundamentales (P/E, ROE, ROA, EPS, márgenes, earnings…): cambian una vez
     por trimestre, así que se guardan en caché (cache/fundamentales.json, que
-    GitHub guarda entre corridas) y cada noche se renuevan los más antiguos
-    (2.000 por defecto). Los activos que HOY quedan en ENTRY/ENTRY+ reciben
-    fundamentales frescos esa misma noche y se recalculan, para que las 4
-    capas de alertas los evalúen con datos del día.
+    GitHub guarda entre corridas). Yahoo los entrega con una consulta por
+    activo y BLOQUEA a quien pide demasiado rápido, así que el orden importa:
+      1º los activos que HOY quedan en ENTRY/ENTRY+ (los únicos que pueden dar
+         alerta): una consulta a la vez, con pausa y reintentos si Yahoo
+         bloquea; luego se recalculan para que las 4 capas los evalúen con
+         fundamentales del día;
+      2º se publica el listado;
+      3º con el tiempo que quede (20 min por defecto) se renuevan los demás,
+         empezando por los más cercanos a ENTRY. Esos se ven desde la noche
+         siguiente.
   · Excluidos: tus grupos actuales (ya los calcula build_data.py) y los ETF
     apalancados o inversos (2X, 3X, UltraShort, Bear, Inverse…).
   · RS (percentil) y las etiquetas Top gainers/losers, más volátiles y más
@@ -27,8 +33,9 @@ Salida:
   data/listado_health.json  informe de salud (siempre)
 
 Variables de entorno: LISTADO_BUDGET_MIN (170), LISTADO_LOTE (100),
-LISTADO_FUND_POR_NOCHE (2000), LISTADO_FUND_HILOS (4), LISTADO_MAX_REPARAR (4000),
-LISTADO_MAX_STALE_PCT (10), FENIX_CACHE_DIR (cache).
+LISTADO_FUND_POR_NOCHE (2000), LISTADO_FUND_MIN (20), LISTADO_FUND_HILOS (1),
+LISTADO_FUND_PAUSA (0.35), LISTADO_FUND_DIAS (21), LISTADO_MAX_REPARAR (10000), LISTADO_MAX_STALE_PCT (10),
+FENIX_CACHE_DIR (cache).
 """
 import argparse, json, os, re, sys, time, bisect
 import concurrent.futures as cf
@@ -50,8 +57,16 @@ GROUP = "🌐 Listado completo"
 BUDGET_MIN = float(os.environ.get("LISTADO_BUDGET_MIN", "170"))
 LOTE = int(os.environ.get("LISTADO_LOTE", "100"))
 FUND_NOCHE = int(os.environ.get("LISTADO_FUND_POR_NOCHE", "2000"))
-FUND_HILOS = int(os.environ.get("LISTADO_FUND_HILOS", "4"))
-MAX_REPARAR = int(os.environ.get("LISTADO_MAX_REPARAR", "4000"))
+# Yahoo bloqueó la máquina tras ~600 consultas con 4 hilos (1-oct-2026): los
+# candidatos se quedaron sin fundamentales y casi ninguno pudo pasar las capas
+# Analysis y Game Theory. Una consulta a la vez, como hace build_data.py con tus
+# grupos (1.100+ por noche sin bloqueo).
+FUND_HILOS = int(os.environ.get("LISTADO_FUND_HILOS", "1"))
+FUND_PAUSA = float(os.environ.get("LISTADO_FUND_PAUSA", "0.35"))     # segundos entre consultas
+FUND_MIN = float(os.environ.get("LISTADO_FUND_MIN", "20"))           # minutos para la renovación general
+RACHA_BLOQUEO = 8      # fallos seguidos = Yahoo está bloqueando (no "activos sin datos")
+ROT_DIAS = int(os.environ.get("LISTADO_FUND_DIAS", "21"))            # antigüedad para renovar (cambian por trimestre)
+MAX_REPARAR = int(os.environ.get("LISTADO_MAX_REPARAR", "10000"))
 MAX_STALE = float(os.environ.get("LISTADO_MAX_STALE_PCT", "10"))
 FRESCO_H = 20          # horas: fundamentales "del día" para los candidatos
 
@@ -188,47 +203,99 @@ def fetch_fund(sym):
     return sym, {"info": info, "cal": cal, "ts": now_iso()}, None
 
 
-def refresh_fund(prov, syms, deadline, label):
-    """Renueva fundamentales con varios hilos; se detiene ante bloqueo de Yahoo."""
-    ok = fail = seguidos = 0
-    if not syms:
-        return 0, 0
-    with cf.ThreadPoolExecutor(max_workers=FUND_HILOS) as ex:
-        futs = {}
-        it = iter(syms)
-        def submit_next():
-            try:
-                s = next(it)
-            except StopIteration:
-                return False
-            futs[ex.submit(fetch_fund, s)] = s
-            return True
-        for _ in range(FUND_HILOS * 2):
-            if not submit_next():
-                break
-        while futs:
-            done, _ = cf.wait(list(futs), return_when=cf.FIRST_COMPLETED)
-            for f in done:
-                futs.pop(f)
-                sym, entry, err = f.result()
-                if entry:
-                    prov.cache[sym] = entry
-                    ok += 1; seguidos = 0
+R_BLOQUEO = re.compile(r"too many requests|rate.?limit|\b429\b|\b401\b|unauthorized|crumb|\b403\b|forbidden", re.I)
+
+
+def _sin_info(prov, sym, err):
+    """El activo no tiene ficha en Yahoo (no es un bloqueo): no se reintenta en 7 días."""
+    prev = prov.cache.get(sym) or {}
+    prev.setdefault("info", None)
+    prev["err"] = err; prev["err_ts"] = now_iso()
+    prov.cache[sym] = prev
+
+
+def refresh_fund(prov, syms, deadline, label, reintentos=3, hilos=None, pausa=None):
+    """Renueva fundamentales SIN provocar el bloqueo de Yahoo y sin confundirlo
+    con "activo sin datos":
+      · una consulta a la vez (o `hilos`), con `pausa` entre consultas;
+      · un error de límite, o RACHA_BLOQUEO fallos seguidos, es un bloqueo: se
+        espera (60, 120, 240 s…) y se REINTENTAN esos mismos activos, hasta
+        `reintentos` esperas; si sigue, se deja para la próxima corrida;
+      · solo los fallos aislados (entre dos consultas buenas) se anotan como
+        "sin info" y se saltan 7 días.
+    Devuelve {ok, sin_info, faltan: [símbolos que no se pudieron traer], bloqueado}."""
+    hilos = hilos or FUND_HILOS
+    pausa = FUND_PAUSA if pausa is None else pausa
+    pend = list(dict.fromkeys(syms))
+    out = {"ok": 0, "sin_info": 0, "faltan": [], "bloqueado": False}
+    if not pend:
+        return out
+    racha, veces, esperas, i, fin_visto = [], {}, 0, 0, False
+    ex = cf.ThreadPoolExecutor(max_workers=hilos) if hilos > 1 else None
+
+    def cerrar_racha():                       # fallos aislados: sin ficha en Yahoo
+        for s2, e2 in racha:
+            _sin_info(prov, s2, e2); out["sin_info"] += 1
+        racha.clear()
+
+    try:
+        while True:
+            duro = False
+            if i < len(pend):
+                if time.time() > deadline:
+                    out["faltan"] = [x for x, _ in racha] + pend[i:]
+                    print(f"  ⏱ {label}: se acabó el tiempo — {len(out['faltan'])} quedan para la próxima corrida")
+                    break
+                lote = pend[i:i + hilos]; i += len(lote)
+                res = list(ex.map(fetch_fund, lote)) if ex else [fetch_fund(lote[0])]
+                for sym, entry, err in res:
+                    if entry:
+                        prov.cache[sym] = entry
+                        out["ok"] += 1
+                        cerrar_racha()
+                    else:
+                        racha.append((sym, err))
+                        duro = duro or bool(R_BLOQUEO.search(err or ""))
+                bloqueo = duro or len(racha) >= RACHA_BLOQUEO
+            else:
+                # Fin de la lista: 3+ fallos al final también pueden ser un bloqueo
+                # (lista corta de candidatos); se comprueba una sola vez.
+                bloqueo = len(racha) >= 3 and not fin_visto
+                fin_visto = True
+                if not bloqueo:
+                    cerrar_racha()
+                    break
+            if not bloqueo:
+                time.sleep(pausa)
+                continue
+            espera = min(300, 60 * 2 ** esperas)
+            if esperas >= reintentos or time.time() + espera > deadline:
+                if duro or len(racha) >= RACHA_BLOQUEO:
+                    out["bloqueado"] = True
+                    out["faltan"] = [x for x, _ in racha] + pend[i:]
+                    print(f"  ⚠️ {label}: Yahoo sigue limitando — {len(out['faltan'])} quedan para la próxima corrida")
                 else:
-                    fail += 1; seguidos += 1
-                    prev = prov.cache.get(sym) or {}
-                    prev.setdefault("info", None)
-                    prev["err"] = err; prev["err_ts"] = now_iso()
-                    prov.cache[sym] = prev
-                if seguidos >= 40 or time.time() > deadline:
-                    continue
-                submit_next()
-            if seguidos >= 40:
-                print(f"  ⚠️ {label}: 40 fallos seguidos (Yahoo limitando) — se detiene por hoy")
-                ex.shutdown(wait=False, cancel_futures=True)
+                    cerrar_racha()
                 break
-    print(f"  📚 {label}: {ok} renovados · {fail} fallidos")
-    return ok, fail
+            esperas += 1
+            print(f"  ⏸ {label}: posible límite de Yahoo ({len(racha)} fallos seguidos) — pausa de {espera} s "
+                  f"y se reintenta ({esperas}/{reintentos})")
+            time.sleep(espera)
+            otra = []
+            for s2, e2 in racha:
+                veces[s2] = veces.get(s2, 0) + 1
+                if veces[s2] >= 3 and not R_BLOQUEO.search(e2 or ""):   # vacío tras 3 pausas: sin ficha
+                    _sin_info(prov, s2, e2); out["sin_info"] += 1
+                else:
+                    otra.append(s2)
+            racha.clear()
+            pend[i:i] = otra
+    finally:
+        if ex:
+            ex.shutdown(wait=False, cancel_futures=True)
+    print(f"  📚 {label}: {out['ok']} renovados · {out['sin_info']} sin ficha en Yahoo"
+          f"{' · ' + str(len(out['faltan'])) + ' pendientes' if out['faltan'] else ''}")
+    return out
 
 
 def fund_fecha(prov, sym):
@@ -337,19 +404,21 @@ def main():
     spy_close = spy_hist["Close"].tail(260) if spy_hist is not None and len(spy_hist) > 0 else None
     print(f"  📅 Sesión de referencia (SPY): {ref}")
 
-    # 1) Rotación de fundamentales: primero los que no tienen, luego los más antiguos
+    # 1) Caché de fundamentales. La versión anterior anotaba como "sin info" los
+    #    activos que fallaron porque Yahoo estaba bloqueando; se limpia una vez
+    #    para que no esperen 7 días.
     syms = list(sym2t)
-    def err_reciente(s):     # símbolos sin info en Yahoo: se reintentan cada 7 días, no cada noche
+    if (prov.cache.get("_meta") or {}).get("v", 1) < 2:
+        for e in prov.cache.values():
+            if isinstance(e, dict):
+                e.pop("err_ts", None)
+        prov.cache["_meta"] = {"v": 2}
+    def err_reciente(s):     # símbolos sin ficha en Yahoo: se reintentan cada 7 días, no cada noche
         e = (prov.cache.get(s) or {}).get("err_ts")
         try:
             return (datetime.now(timezone.utc) - datetime.fromisoformat(e.replace("Z", "+00:00"))).days < 7
         except Exception:
             return False
-    rot = sorted((s for s in syms if prov.age_h(s) > 24 * 3 and not err_reciente(s)),
-                 key=lambda s: -prov.age_h(s))[:FUND_NOCHE]           # >3 días de antigüedad
-    refresh_fund(prov, rot, t0 + BUDGET_MIN * 60 * 0.25, "Rotación de fundamentales")
-    with open(FUND_PATH, "w", encoding="utf-8") as f:
-        json.dump(prov.cache, f, ensure_ascii=False, separators=(",", ":"))
 
     # 2) Velas por lotes + filas con get_stock_data()
     rows, keep_hist = {}, {}
@@ -391,10 +460,15 @@ def main():
             print(f"  … {procesados}/{len(syms)} · filas {len(rows)} · reparadas {reparadas} · "
                   f"{(time.time() - t0) / 60:.1f} min")
 
-    # 3) Candidatos de hoy (ENTRY/ENTRY+): fundamentales frescos y recálculo
-    cand = [bd.yf_symbol(t) for t in keep_hist if prov.age_h(bd.yf_symbol(t)) > FRESCO_H]
+    # 3) Candidatos de hoy (ENTRY/ENTRY+): fundamentales frescos ANTES que nadie
+    #    (son los únicos que pueden dar alerta) y recálculo. Primero los de mayor Score.
+    orden = sorted(keep_hist, key=lambda t: -((rows.get(t) or {}).get("score") or 0))
+    cand = [bd.yf_symbol(t) for t in orden if prov.age_h(bd.yf_symbol(t)) > FRESCO_H]
     print(f"  🎯 En ENTRY/ENTRY+ hoy: {len(keep_hist)} · necesitan fundamentales del día: {len(cand)}")
-    refresh_fund(prov, cand, deadline - 5 * 60, "Fundamentales de candidatos")
+    rc = refresh_fund(prov, cand, deadline - 5 * 60, "Fundamentales de candidatos", reintentos=4)
+    cand_ok = sum(1 for t in keep_hist if prov.age_h(bd.yf_symbol(t)) <= FRESCO_H)
+    cand_sin_ficha = sum(1 for t in keep_hist if prov.age_h(bd.yf_symbol(t)) > FRESCO_H
+                         and bd.yf_symbol(t) not in rc["faltan"])
     for t, h in keep_hist.items():
         bd._HIST_CACHE[t] = h
         bd._ROW_CACHE.pop(t, None)
@@ -429,7 +503,11 @@ def main():
         "desactualizados": len(stale), "pct_desactualizados": pct, "umbral_pct": MAX_STALE,
         "reparados": reparadas, "reparacion_fallida": rep_fail,
         "apalancados_excluidos": apal, "con_fundamentales": con_fund,
-        "en_entry_hoy": len(keep_hist), "minutos": round((time.time() - t0) / 60, 1),
+        "en_entry_hoy": len(keep_hist),
+        # Candidatos evaluados con fundamentales del día (sin ellos no pueden pasar Analysis ni Game Theory)
+        "candidatos_con_fundamentales": cand_ok, "candidatos_sin_ficha_yahoo": cand_sin_ficha,
+        "candidatos_pendientes": len(rc["faltan"]), "yahoo_bloqueo_candidatos": rc["bloqueado"],
+        "minutos": round((time.time() - t0) / 60, 1),
     }
     rng = {}
     for k in ("daily", "5d", "20d"):
@@ -438,13 +516,43 @@ def main():
     bd.dump_json(health, OUT_HEALTH)
     print(f"\n  🩺 Listado: {status} · {len(out_rows)} filas · {pct}% desactualizadas · reparadas {reparadas} · "
           f"sin datos {len(sin_datos)} · con fundamentales {con_fund}/{len(syms)} · {health['minutos']} min")
+    print(f"  🎯 Candidatos con fundamentales del día: {cand_ok}/{len(keep_hist)}"
+          f"{' · ' + str(cand_sin_ficha) + ' sin ficha en Yahoo' if cand_sin_ficha else ''}"
+          f"{' · ' + str(len(rc['faltan'])) + ' sin traer (Yahoo limitó)' if rc['faltan'] else ''}")
     if status != "OK" and not args.force_publish:
         print("  ⛔ No se publica el listado (se conserva el anterior; sus alertas no se usan hoy).")
+    else:
+        cols, vals = compact(out_rows)
+        bd.dump_json({"built_at": health["built_at"], "grupo": GROUP, "session_ref": health["session_ref"],
+                      "health": health, "column_ranges": rng, "cols": cols, "rows": vals}, OUT)
+        print(f"  ✅ {OUT} — {len(out_rows)} filas ({os.path.getsize(OUT) / 1e6:.1f} MB)")
+
+    # 5) Con el listado ya publicado: renovación general de fundamentales con el
+    #    tiempo que quede. Primero los que nunca se han traído y están más cerca
+    #    de ENTRY (ACCUM, mayor Score); después los más antiguos. Se verán desde
+    #    la próxima corrida. Si Yahoo limita, se deja para mañana.
+    if rc["bloqueado"]:
+        print("  ℹ️ Renovación general omitida hoy: Yahoo ya estaba limitando con los candidatos.")
         return
-    cols, vals = compact(out_rows)
-    bd.dump_json({"built_at": health["built_at"], "grupo": GROUP, "session_ref": health["session_ref"],
-                  "health": health, "column_ranges": rng, "cols": cols, "rows": vals}, OUT)
-    print(f"  ✅ {OUT} — {len(out_rows)} filas ({os.path.getsize(OUT) / 1e6:.1f} MB)")
+    con_fila = {bd.yf_symbol(r["ticker"]): r for r in out_rows if not r.get("stale")}
+    def prioridad(sy):
+        r = con_fila[sy]
+        return (0 if prov.age_h(sy) >= 1e9 else 1, 0 if r.get("state") == "ACCUM" else 1,
+                -(r.get("score") or 0), -min(prov.age_h(sy), 1e9))
+    rot = sorted((sy for sy in con_fila if prov.age_h(sy) > 24 * ROT_DIAS and not err_reciente(sy)),
+                 key=prioridad)[:FUND_NOCHE]
+    rr = refresh_fund(prov, rot, min(deadline - 60, time.time() + FUND_MIN * 60), "Renovación general de fundamentales",
+                      reintentos=1)
+    with open(FUND_PATH, "w", encoding="utf-8") as f:
+        json.dump(prov.cache, f, ensure_ascii=False, separators=(",", ":"))
+    try:
+        health["con_fundamentales"] = sum(1 for sy in syms if (prov.cache.get(sy) or {}).get("info"))
+        health["renovados_hoy"] = rr["ok"]; health["yahoo_bloqueo_renovacion"] = rr["bloqueado"]
+        health["minutos"] = round((time.time() - t0) / 60, 1)
+        bd.dump_json(health, OUT_HEALTH)
+        print(f"  📚 Fundamentales en caché: {health['con_fundamentales']}/{len(syms)}")
+    except Exception as e:
+        print(f"  ⚠️ no se pudo actualizar la salud del listado: {e}")
 
 
 if __name__ == "__main__":

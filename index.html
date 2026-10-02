@@ -308,8 +308,9 @@ table.an-table tr:hover{background:var(--bg3)}
   <span style="margin-left:auto;color:var(--txt3);font-size:10px" id="ah-count"></span></div>
   <div class="an-controls" id="sg-bar" style="background:linear-gradient(90deg,rgba(255,112,67,.10),rgba(255,171,0,.05))">
   <span class="ctrl-label" style="color:#ff8a50;font-weight:700">⬇ Seguimiento Excel/CSV</span>
-  <select class="ctrl-select" id="sg-mode" title="Qué filas descargar"><option value="senales">Señales del día</option><option value="movimientos">Movimientos del día (señal, fill, TP1 o cierre)</option><option value="todo">Todo el historial</option></select>
-  <input type="date" id="sg-day" class="ctrl-select" style="color-scheme:dark" title="Día (fecha de la vela de la señal)">
+  <select class="ctrl-select" id="sg-mode" title="Qué filas descargar"><option value="fills">Fills del día (entradas activadas)</option><option value="senales">Señales del día</option><option value="movimientos">Movimientos del día (señal, fill, TP1 o cierre)</option><option value="todo">Todo el historial</option></select>
+  <input type="date" id="sg-day" class="ctrl-select" style="color-scheme:dark" title="Día de la sesión (vela del fill o de la señal, según lo que elijas a la izquierda)">
+  <select class="ctrl-select" id="sg-par" title="De qué día salen Hessian, Markov, Game Theory, Entry Zones, Analysis y Laplace. Día del fill: lo que mostraban las pestañas la noche en que se activó la entrada (sin fill quedan vacíos, igual que las EMA)."><option value="fill">Parámetros: día del fill</option><option value="senal">Parámetros: día de la señal</option></select>
   <select class="ctrl-select" id="sg-fmt" title="Formato"><option value="xlsx">Excel (.xlsx)</option><option value="csv_es">CSV para Excel en español ( ; )</option><option value="csv">CSV estándar ( , )</option></select>
   <button onclick="downloadSeguimiento()" style="padding:5px 14px;background:#ff7043;color:#000;border:none;border-radius:4px;cursor:pointer;font-size:11px;font-weight:800;font-family:inherit">Descargar</button>
   <span id="sg-status" style="color:var(--txt3);font-size:10px"></span></div>
@@ -695,7 +696,11 @@ function lsSync(){
 function lsPanel(){
   var p=document.getElementById("ls-panel");var h=(window._lsMeta||{}).health||{};
   var html='<div style="font-weight:700;color:#ff8a50;margin-bottom:6px">🌐 Listado completo'+(window._lsLoaded?" · "+lsCount()+" activos":"")+'</div>';
-  if(window._lsLoaded)html+='<div style="color:var(--txt3);font-size:10px;margin-bottom:8px">Sesión '+((window._lsMeta||{}).session_ref||"—")+" · "+(h.con_fundamentales||0)+" con fundamentales · ETF apalancados/inversos excluidos: "+(h.apalancados_excluidos||0)+"</div>";
+  if(window._lsLoaded)html+='<div style="color:var(--txt3);font-size:10px;margin-bottom:8px">Sesión '+((window._lsMeta||{}).session_ref||"—")+" · "+(h.con_fundamentales||0)+" con fundamentales · ETF apalancados/inversos excluidos: "+(h.apalancados_excluidos||0)
+    +(h.en_entry_hoy!=null?'<br>Candidatos de hoy (ENTRY/ENTRY+): <b style="color:var(--txt)">'+h.en_entry_hoy+"</b>"
+      +(h.candidatos_con_fundamentales!=null?' · evaluados con fundamentales del día: <b style="color:'+(h.candidatos_pendientes?"var(--amber)":"var(--green)")+'">'+h.candidatos_con_fundamentales+"</b>"
+        +(h.candidatos_pendientes?" · "+h.candidatos_pendientes+" sin traer (Yahoo limitó las consultas: esos no pudieron dar alerta hoy)":""):""):"")
+    +"</div>";
   html+='<div style="color:var(--txt2);margin-bottom:4px">Mostrarlo en:</div>';
   LS_TABS.forEach(function(x){
     var col=x[2]==="rápido"?"var(--green)":x[2]==="medio"?"var(--amber)":"var(--red)";
@@ -1848,8 +1853,10 @@ window.renderAlertHistory=function(){
 // === FENIX: DESCARGA DEL SEGUIMIENTO (Excel / CSV) ===
 // Columnas y valores idénticos a tu hoja SEGUIMIENTO (A→AY). Los parámetros de
 // cada pestaña salen de fenix_params.js (copia literal de las fórmulas de este
-// archivo) con la fila del snapshot del DÍA DE LA SEÑAL guardada en
-// data/seguimiento.json por la actualización nocturna.
+// archivo) con la fila del snapshot del DÍA DEL FILL guardada en
+// data/seguimiento.json por la actualización nocturna (lo que mostraban las
+// pestañas la noche en que se activó la entrada). Sin fill no hay parámetros.
+// Opción "Parámetros: día de la señal" → fila del día en que apareció la señal.
 var SHEETJS_URL="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js";
 var _segData=null;
 function loadScriptOnce(src){return new Promise(function(res,rej){
@@ -1858,7 +1865,7 @@ function loadScriptOnce(src){return new Promise(function(res,rej){
   s.onload=function(){res()};s.onerror=function(){rej(new Error("no se pudo cargar "+src))};document.head.appendChild(s)})}
 function sgDefaultDay(){
   var srv=window._srvHistory;var d="";
-  if(srv&&srv.alerts)srv.alerts.forEach(function(a){var x=a.asof||(a.alerted_at||"").slice(0,10);if(x>d)d=x});
+  if(srv&&srv.alerts)srv.alerts.forEach(function(a){var x=a.asof||(a.alerted_at||"").slice(0,10);if(x>d)d=x;if(a.fill_date&&a.fill_date>d)d=a.fill_date});
   var el=document.getElementById("sg-day");if(el&&!el.value&&d)el.value=d;
 }
 function sgBlob(content,name,type){
@@ -1901,6 +1908,7 @@ function sgXlsx(F,table,name,verif){
 window.downloadSeguimiento=function(){
   var st=document.getElementById("sg-status");
   var mode=document.getElementById("sg-mode").value,day=document.getElementById("sg-day").value,fmt=document.getElementById("sg-fmt").value;
+  var par=(document.getElementById("sg-par")||{}).value||"fill";
   if(mode!=="todo"&&!day){st.textContent="Elige el día.";return}
   st.textContent="Preparando…";
   Promise.all([
@@ -1911,24 +1919,39 @@ window.downloadSeguimiento=function(){
     if(!hist||!hist.alerts)throw new Error("el historial del servidor (data/alerts_history.json) aún no está disponible");
     var rows={},src=_segData.rows||{},avgs=null,live=0;
     for(var k in src)rows[k]=src[k];
-    // Respaldo: alerta sin datos guardados cuya vela coincide con el snapshot abierto
+    // Respaldo: alerta sin datos guardados cuya vela (del fill o de la señal)
+    // coincide con el snapshot abierto → se usa la fila que estás viendo en las pestañas
     hist.alerts.forEach(function(a){
-      var c=rows[a.id]||{};if(c.row||!snapshot)return;
-      var r=findRow(a.ticker);if(!r||!hasPrice(r)||r.asof!==(a.asof||(a.alerted_at||"").slice(0,10)))return;
-      avgs=avgs||F.sectorRoeAvgs(getAllStocks());
+      if(!snapshot)return;
+      var c=rows[a.id]||{},sd=a.asof||(a.alerted_at||"").slice(0,10);
+      var needS=!c.row,needF=!!a.fill_date&&!(c.row_fill&&c.row_fill.asof===a.fill_date);
+      if(!needS&&!needF)return;
+      var r=findRow(a.ticker);if(!r||!hasPrice(r)||r.stale)return;
+      var okS=needS&&r.asof===sd,okF=needF&&r.asof===a.fill_date;if(!okS&&!okF)return;
+      avgs=avgs||F.sectorRoeAvgs(_uniq(false));
       var rr={};for(var x in r)rr[x]=r[x];rr._sec_roe_avg=avgs[r.sector]||0;
-      var cc={};for(var y in c)cc[y]=c[y];cc.row=rr;
+      var cc={};for(var y in c)cc[y]=c[y];
+      if(okS)cc.row=rr;
+      if(okF){cc.row_fill=rr;live++}
       if(!cc.sector){var etf=isEtfOrIndex(r);cc.sector=etf?"ETF":(r.sector||"—");cc.industry=r.industry||(etf?"Exchange Traded Fund":"—")}
-      rows[a.id]=cc;live++;
+      rows[a.id]=cc;
     });
-    var table=F.buildTable(hist,{rows:rows},mode,day);
+    var table=F.buildTable(hist,{rows:rows},mode,day,{paramDia:par});
     if(!table.length){st.textContent="No hay alertas para "+(mode==="todo"?"el historial":day)+".";return}
-    var name="Fenix_Seguimiento_"+(mode==="todo"?"historial_completo":(mode==="senales"?"senales_":"movimientos_")+day);
+    var name="Fenix_Seguimiento_"+(mode==="todo"?"historial_completo":(mode==="senales"?"senales_":mode==="fills"?"fills_":"movimientos_")+day)+(par==="senal"?"_param_senal":"");
     var iMk=F.COLUMNS.findIndex(function(c){return c[0]==="mk_score"}),iM5=F.COLUMNS.findIndex(function(c){return c[0]==="m5_20"});
     var iFill=F.COLUMNS.findIndex(function(c){return c[0]==="f_fill"});
-    var sinPar=table.filter(function(r){return r[iMk]==null}).length;
     var conFill=table.filter(function(r){return r[iFill]!=null}).length,sinEma=table.filter(function(r){return r[iFill]!=null&&r[iM5]==null}).length;
-    var msg=table.length+" filas"+(sinPar?" · "+sinPar+" sin parámetros de pestañas":"")+" · EMA en el fill: "+(conFill-sinEma)+" de "+conFill+" con fill"+(sinEma?" (las demás se calculan la noche del fill; Yahoo solo guarda 60 días de 5 min)":"")+(table.length>conFill?" · sin fill = EMA vacías":"");
+    // Estado de los parámetros de pestañas, alerta por alerta
+    var pe={ok:0,sin_fill:0,sin_snapshot:0,pendiente:0,sin_fila:0};
+    hist.alerts.filter(function(a){return F.inRange(a,mode,day)}).forEach(function(a){pe[F.paramEstado(a,rows[a.id],par)]++});
+    var msgPar=par==="senal"
+      ?"parámetros del día de la SEÑAL: "+pe.ok+" de "+table.length+(pe.sin_fila?" ("+pe.sin_fila+" sin datos de ese día)":"")
+      :"parámetros del día del FILL: "+pe.ok+" de "+conFill+" con fill"
+        +(pe.pendiente?" · "+pe.pendiente+" se guardan en la actualización de esta noche":"")
+        +(pe.sin_snapshot?" · "+pe.sin_snapshot+" sin snapshot de ese día (no recuperable)":"")
+        +(pe.sin_fill?" · "+pe.sin_fill+" sin fill = parámetros y EMA vacíos":"");
+    var msg=table.length+" filas · "+msgPar+" · EMA en el fill: "+(conFill-sinEma)+" de "+conFill+(sinEma?" (las demás se calculan la noche del fill; Yahoo solo guarda 60 días de 5 min)":"");
     if(fmt==="xlsx"){
       var verif=F.buildVerif(hist,{rows:rows},mode,day);
       return loadScriptOnce(SHEETJS_URL).then(function(){sgXlsx(F,table,name,verif);st.textContent="✅ "+msg}).catch(function(e){

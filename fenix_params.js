@@ -443,6 +443,24 @@ function buildVerif(history, seg, mode, day) {
   return out;
 }
 
+// Fila del snapshot con la que se calculan los parámetros de las pestañas.
+//   "fill"  (por defecto): la del día del fill; null si aún no hay fill o si
+//            no existe snapshot de ese día.
+//   "senal": la del día en que apareció la señal.
+function paramRow(a, cap, dia) {
+  cap = cap || {};
+  if (dia === "senal") return cap.row || null;
+  var rf = cap.row_fill;
+  return (a.fill_date && rf && rf.asof === a.fill_date) ? rf : null;
+}
+// Por qué una alerta no tiene parámetros (para el mensaje de la descarga)
+function paramEstado(a, cap, dia) {
+  if (paramRow(a, cap, dia)) return "ok";
+  if (dia === "senal") return "sin_fila";
+  if (!a.fill_date) return "sin_fill";
+  return (cap && cap.row_fill_falta) ? "sin_snapshot" : "pendiente";
+}
+
 // Una fila de la hoja SEGUIMIENTO a partir de la alerta y de lo capturado
 function buildRow(a, cap, opts) {
   opts = opts || {};
@@ -466,7 +484,11 @@ function buildRow(a, cap, opts) {
   o.m5_20 = m5[0]; o.m5_200 = m5[1]; o.m5_dif = m5[2];
   o.h1_20 = h1[0]; o.h1_200 = h1[1]; o.h1_dif = h1[2];
   o.d1_20 = d1[0]; o.d1_200 = d1[1]; o.d1_dif = d1[2];
-  var r = cap.row;
+  // Parámetros de las pestañas: por defecto, la fila del snapshot del DÍA DEL
+  // FILL (lo que mostraban Hessian, Markov, Game Theory, Entry Zones, Analysis y
+  // Laplace la noche en que se activó la entrada). Sin fill → vacíos, igual que
+  // las distancias EMA. opts.paramDia = "senal" usa la fila del día de la señal.
+  var r = paramRow(a, cap, opts.paramDia);
   if (r && r.close != null) {
     var h = hessian(r);
     if (h) { o.h_clase = tc(h.clase); o.h_fxx = h.fxx; o.h_fyy = h.fyy; o.h_det = h.det; o.h_curv = h.curvature; o.h_senal = tc(h.signal); }
@@ -507,6 +529,7 @@ function inRange(a, mode, day) {
   if (mode === "todo") return true;
   var sd = a.asof || (a.alerted_at || "").slice(0, 10);
   if (mode === "senales") return sd === day;
+  if (mode === "fills") return a.fill_date === day;
   // "movimientos": señal, fill, TP1 o cierre en ese día
   return sd === day || a.fill_date === day || a.tp1_date === day || a.outcome_date === day;
 }
@@ -545,6 +568,7 @@ return { DEFAULTS: DEFAULTS, GROUPS: GROUPS, COLUMNS: COLUMNS, ESTADOS: ESTADOS,
          hessian: hessian, laplace: laplace, buildRow: buildRow, buildTable: buildTable,
          inRange: inRange, toCSV: toCSV, tc: tc, sectorRoeAvgs: sectorRoeAvgs,
          VERIF_COLUMNS: VERIF_COLUMNS, buildVerif: buildVerif, emaFill: emaFill,
+         paramRow: paramRow, paramEstado: paramEstado,
          _lit: { compositeScore: compositeScore, compositeGrade: compositeGrade, earlinessScore: earlinessScore,
                  earlinessLabel: earlinessLabel, laplaceAnalysis: laplaceAnalysis, mkEstimateTransitionMatrix: mkEstimateTransitionMatrix } };
 });

@@ -2,11 +2,14 @@
 """
 FENIX SCANNER PRO — Seguimiento diario (datos para el Excel/CSV del Historial)
 
-Para cada alerta del Historial guarda, UNA sola vez y del día de la señal:
+Para cada alerta del Historial guarda, UNA sola vez:
 
-  · la fila del snapshot con la que se calculan las pestañas (Hessian, Markov,
-    Game Theory, Entry Zones, Analysis, Laplace) — así el Excel muestra los
-    valores que esas pestañas mostraban ESE día, no los de hoy;
+  · la fila del snapshot del DÍA DEL FILL (row_fill), con la que se calculan las
+    pestañas (Hessian, Markov, Game Theory, Entry Zones, Analysis, Laplace): el
+    Excel muestra lo que esas pestañas mostraban la noche en que se activó la
+    entrada, no lo del día en que apareció la señal ni lo de hoy. Sin fill no
+    hay parámetros. También se guarda la fila del día de la señal (row), que el
+    Excel solo usa si eliges "Parámetros: día de la señal";
   · Sector e Industria (mismo LISTADO que usa tu Excel: data/universe.json);
   · la distancia a la EMA20 y a la EMA200 en 5 min, 1 hora y 1 día medida EN EL
     FILL: el primer encuentro del precio con el nivel de entrada el día del fill,
@@ -22,7 +25,9 @@ scripts/seguimiento_export.js. Aquí solo se guardan los datos de entrada.
 
 Uso:
   python scripts/seguimiento.py                  # corrida normal (workflows)
-  python scripts/seguimiento.py --desde-git      # rellena desde el historial git de snapshot.json
+  python scripts/seguimiento.py --desde-git      # recorre TODO el historial git de snapshot.json / listado.json
+  (sin --desde-git, si falta la fila del día de un fill ya pasado, se busca sola
+   en el historial git de los días necesarios y en scripts/seguimiento_fill_historico.json)
   python scripts/seguimiento.py --sin-red        # no descarga velas (solo captura filas)
 """
 import argparse, json, math, os, subprocess, sys, time
@@ -119,29 +124,175 @@ def sector_roe_avgs(idx):
     return {k: (v[0] / v[1] if v[1] else 0.0) for k, v in acc.items()}
 
 
-def capture_rows(seg, alerts, snap, universe, origin, avg_snap=None):
-    """Guarda la fila del snapshot para las alertas cuya fecha de señal
-    coincide con la vela de ese snapshot. `avg_snap`: de dónde sale el promedio
-    de ROE por sector (por defecto, el mismo snapshot = lo que muestra Analysis)."""
+def snap_final(snap, dia):
+    """True si el snapshot se construyó con la sesión `dia` ya cerrada (16:10 ET
+    o después). Las corridas intradía de las 10:00 y 13:00 (hora de Colombia)
+    arman un snapshot con la vela a medio hacer: sirve para detectar la señal,
+    pero NO es lo que muestran las pestañas esa noche, así que no se usa para
+    la fila del día del fill."""
+    try:
+        from zoneinfo import ZoneInfo
+        t = datetime.fromisoformat(str(snap.get("built_at")).replace("Z", "+00:00")).astimezone(ZoneInfo("America/New_York"))
+    except Exception:
+        return sesion_cerrada(dia)
+    d = str(t.date())
+    return dia < d or (dia == d and t.hour * 60 + t.minute >= 16 * 60 + 10)
+
+
+def capture_rows(seg, alerts, snap, universe, origin, avg_snap=None, campo="row"):
+    """Guarda la fila del snapshot de cada alerta cuando la vela de ese snapshot
+    coincide con el día buscado:
+      campo="row"       → día de la SEÑAL
+      campo="row_fill"  → día del FILL (el que usa el Excel por defecto)
+    `avg_snap`: de dónde sale el promedio de ROE por sector (por defecto, el
+    mismo snapshot = lo que muestra Analysis)."""
     idx = snapshot_rows(snap)
     avg_idx = snapshot_rows(avg_snap) if avg_snap is not None else idx
     avgs = None
     n = 0
     for a in alerts:
         rec = seg["rows"].setdefault(a["id"], {})
-        if rec.get("row"):
+        dia = alert_date(a) if campo == "row" else a.get("fill_date")
+        if not dia:
+            continue
+        if rec.get(campo) and (campo == "row" or rec[campo].get("asof") == dia):
             continue
         r = idx.get(a["ticker"])
-        if not valid_row(r) or r.get("asof") != alert_date(a):
+        if not valid_row(r) or r.get("asof") != dia:
             continue
+        if campo == "row_fill" and not snap_final(snap, dia):
+            continue                      # snapshot intradía: se espera al del cierre
         if avgs is None:
             avgs = sector_roe_avgs(avg_idx)
-        rec["row"] = {k: r.get(k) for k in ROW_KEYS}
-        rec["row"]["_sec_roe_avg"] = round(avgs.get(r.get("sector"), 0.0), 6)
-        rec["captured_from"] = origin
-        rec["snap_built_at"] = snap.get("built_at")
+        rec[campo] = {k: r.get(k) for k in ROW_KEYS}
+        rec[campo]["_sec_roe_avg"] = round(avgs.get(r.get("sector"), 0.0), 6)
+        if campo == "row":
+            rec["captured_from"] = origin
+            rec["snap_built_at"] = snap.get("built_at")
+        else:
+            rec["row_fill_from"] = origin
+            rec.pop("row_fill_falta", None)
         n += 1
     return n
+
+
+def capture_both(seg, alerts, snap, universe, origin, avg_snap=None):
+    return (capture_rows(seg, alerts, snap, universe, origin, avg_snap, "row"),
+            capture_rows(seg, alerts, snap, universe, origin, avg_snap, "row_fill"))
+
+
+def listado_as_snap(L):
+    """data/listado.json (formato compacto) con la forma de un snapshot."""
+    if not L or not L.get("cols"):
+        return None
+    lrows = [dict(zip(L["cols"], v)) for v in L.get("rows", [])]
+    return {"groups": {L.get("grupo", "listado"): lrows}, "built_at": L.get("built_at"),
+            "session_ref": L.get("session_ref")}
+
+
+def fill_pendientes(seg, alerts):
+    """Alertas con fill cuya fila del día del fill todavía no está guardada.
+    De paso descarta filas que ya no corresponden (el fill cambió o se anuló)."""
+    out = []
+    for a in alerts:
+        rec = seg["rows"].setdefault(a["id"], {})
+        fd = a.get("fill_date")
+        rf = rec.get("row_fill")
+        if rf and (not fd or rf.get("asof") != fd):
+            rec.pop("row_fill", None); rec.pop("row_fill_from", None); rf = None
+        if rec.get("row_fill_falta") and (not fd or rec["row_fill_falta"].get("dia") != fd):
+            rec.pop("row_fill_falta", None)
+        if fd and not rf and not rec.get("row_fill_falta"):
+            out.append(a)
+    return out
+
+
+def aplicar_semilla(seg, alerts):
+    """Filas del día del fill de las alertas anteriores a Fenix (salen de los
+    snapshots que publicó AndFig). Archivo: scripts/seguimiento_fill_historico.json
+    con {"rows": {"TICKER|AAAA-MM-DD": fila}}. Solo se usa para lo que falte."""
+    pend = fill_pendientes(seg, alerts)
+    if not pend:
+        return 0
+    seed = load(os.path.join(BASE, "scripts", "seguimiento_fill_historico.json"), {}).get("rows") or {}
+    n = 0
+    for a in pend:
+        r = seed.get(f"{a['ticker']}|{a['fill_date']}")
+        if r and r.get("asof") == a["fill_date"] and r.get("close") is not None:
+            rec = seg["rows"][a["id"]]
+            rec["row_fill"] = dict(r)
+            rec["row_fill_from"] = "historico-andfig"
+            n += 1
+    return n
+
+
+def _git(args, timeout=300):
+    return subprocess.run(["git"] + args, cwd=BASE, capture_output=True, timeout=timeout)
+
+
+def _git_json(commit, path):
+    try:
+        r = _git(["show", f"{commit}:{path}"])
+        return json.loads(r.stdout) if r.returncode == 0 else None
+    except Exception:
+        return None
+
+
+def backfill_git(seg, alerts, universe, session_ref, fetch=True):
+    """Fila del día del fill para fills de días que YA pasaron (el snapshot de
+    hoy no sirve): se busca en el historial git del propio repositorio, solo en
+    los días necesarios. En GitHub Actions el repositorio llega con un solo
+    commit, así que primero se trae el historial desde el fill más antiguo que
+    falta (sin descargar archivos: solo se leen los snapshots necesarios)."""
+    def viejos():
+        return [a for a in fill_pendientes(seg, alerts) if session_ref and a["fill_date"] < session_ref]
+    pend = viejos()
+    if not pend:
+        return 0
+    desde = min(a["fill_date"] for a in pend)
+    tot, buscado = 0, False
+    try:
+        if _git(["rev-parse", "--is-inside-work-tree"], 30).returncode != 0:
+            raise RuntimeError("esta carpeta no es un repositorio git")
+        completo = _git(["rev-parse", "--is-shallow-repository"], 30).stdout.decode().strip() != "true"
+        if not completo and fetch:
+            rama = os.environ.get("GITHUB_REF_NAME") or \
+                _git(["rev-parse", "--abbrev-ref", "HEAD"], 30).stdout.decode().strip() or "main"
+            r = _git(["fetch", "--quiet", "--filter=blob:none", f"--shallow-since={desde} 00:00:00 +0000",
+                      "origin", rama], 420)
+            completo = r.returncode == 0
+            if not completo:
+                print(f"  ⚠️ no se pudo traer el historial git: {r.stderr.decode()[:160].strip()}")
+        r = _git(["log", "--format=%H", f"--since={desde} 00:00:00 +0000", "--",
+                  "data/snapshot.json", "data/listado.json"], 60)
+        if r.returncode != 0:
+            raise RuntimeError(r.stderr.decode()[:160].strip())
+        for c in r.stdout.decode().split():             # del más reciente al más antiguo
+            fechas = {a["fill_date"] for a in viejos()}
+            if not fechas:
+                break
+            dia = (_git_json(c, "data/health.json") or {}).get("session_ref")
+            if dia is not None and dia not in fechas:
+                continue                                 # ese commit es de otra sesión
+            snap = _git_json(c, "data/snapshot.json")
+            if not snap:
+                continue
+            tot += capture_rows(seg, alerts, snap, universe, f"git:{c[:7]}", None, "row_fill")
+            if any(dia is None or a["fill_date"] == dia for a in viejos()):
+                ls = listado_as_snap(_git_json(c, "data/listado.json"))   # alertas del listado completo
+                if ls:
+                    tot += capture_rows(seg, alerts, ls, universe, f"git:{c[:7]}:listado", snap, "row_fill")
+        buscado = completo
+    except Exception as e:
+        print(f"  ⚠️ historial git no disponible: {e}")
+    # Lo que sigue faltando tras buscar en TODO el historial necesario no se puede
+    # recuperar: ese día no se publicó un snapshot sano (o la fila del ticker no
+    # tenía precio). Se anota y no se reintenta cada noche.
+    if buscado:
+        for a in viejos():
+            seg["rows"][a["id"]]["row_fill_falta"] = {
+                "dia": a["fill_date"], "motivo": "no hay snapshot sano publicado con la vela de ese día"}
+    return tot
 
 
 def fill_sector(seg, alerts, universe):
@@ -356,7 +507,8 @@ def main():
     ap.add_argument("--desde-git", action="store_true",
                     help="captura filas de alertas antiguas desde el historial git de data/snapshot.json")
     ap.add_argument("--snapshots-dir", help="(pruebas) carpeta con snapshots *.json en orden de nombre")
-    ap.add_argument("--sin-red", action="store_true", help="no descarga velas intradía")
+    ap.add_argument("--sin-red", action="store_true", help="no descarga velas intradía ni trae historial git")
+    ap.add_argument("--sin-ema", action="store_true", help="(pruebas) no calcula las distancias EMA")
     args = ap.parse_args()
 
     print("═" * 55 + "\nSEGUIMIENTO (datos para Excel/CSV)\n" + "═" * 55)
@@ -365,48 +517,65 @@ def main():
     universe = load(os.path.join(DATA, "universe.json"), {})
     seg = load(OUT, {})
     seg.setdefault("rows", {})
-    seg["version"] = 2
+    seg["version"] = 3
+    seg["parametros_dia"] = ("Los parámetros de las pestañas salen de row_fill: la fila del snapshot del día del "
+                             "fill. row = fila del día de la señal (opcional en la descarga).")
     seg["formula_dis_ema"] = ("En el FILL: primer encuentro del precio con el nivel de entrada el día del fill "
                               "(script 'Nivel → EMAs + POC v3'); Δ = EMA_N − nivel (en $), EMA de la vela del encuentro")
     seg["parametros"] = {"markov_periodos": 5, "laplace_s": 0.3, "game_theory": "nash / semana",
                          "entry_zones": "semana"}
 
     core_snap = load(os.path.join(DATA, "snapshot.json"), {})
-    n = capture_rows(seg, alerts, core_snap, universe, "snapshot")
-    print(f"  Filas capturadas del snapshot actual: {n}")
+    n, nf = capture_both(seg, alerts, core_snap, universe, "snapshot")
+    print(f"  Snapshot actual ({core_snap.get('session_ref')}): {n} filas del día de la señal · {nf} del día del fill")
     # Alertas del listado completo: fila de data/listado.json; el promedio de ROE
     # por sector es el de tus grupos (lo que muestra la pestaña Analysis por defecto)
-    L = load(os.path.join(DATA, "listado.json"), {})
-    if L.get("cols"):
-        lrows = [dict(zip(L["cols"], v)) for v in L.get("rows", [])]
-        n2 = capture_rows(seg, alerts, {"groups": {L.get("grupo", "listado"): lrows}, "built_at": L.get("built_at")},
-                          universe, "listado", avg_snap=core_snap)
-        print(f"  Filas capturadas del listado completo: {n2}")
+    ls = listado_as_snap(load(os.path.join(DATA, "listado.json"), {}))
+    if ls:
+        n2, nf2 = capture_both(seg, alerts, ls, universe, "listado", avg_snap=core_snap)
+        print(f"  Listado completo: {n2} filas del día de la señal · {nf2} del día del fill")
     if args.desde_git or args.snapshots_dir:
-        tot = 0
+        tot = totf = 0
         if args.snapshots_dir:
             files = sorted(f for f in os.listdir(args.snapshots_dir) if f.endswith(".json"))
             src = ((f, load(os.path.join(args.snapshots_dir, f), {})) for f in files)
         else:
             src = iter_git_snapshots()
         for c, snap in src:
-            tot += capture_rows(seg, alerts, snap, universe, f"git:{str(c)[:7]}")
-        print(f"  Filas capturadas del historial: {tot}")
+            x, y = capture_both(seg, alerts, snap, universe, f"git:{str(c)[:7]}")
+            tot += x; totf += y
+        print(f"  Historial: {tot} filas del día de la señal · {totf} del día del fill")
+    # Día del fill de alertas anteriores: semilla histórica y, si hace falta, el
+    # historial git del repositorio (solo los días que falten)
+    ns = aplicar_semilla(seg, alerts)
+    if ns:
+        print(f"  Día del fill desde el histórico de AndFig: {ns}")
+    ref = core_snap.get("session_ref") or None
+    ng = backfill_git(seg, alerts, universe, ref, fetch=not args.sin_red)
+    if ng:
+        print(f"  Día del fill recuperado del historial git: {ng}")
     fill_sector(seg, alerts, universe)
-    if not args.sin_red:
+    if not args.sin_red and not args.sin_ema:
         k = fill_emas(seg, alerts, MAX_DOWNLOADS)
         print(f"  Distancias EMA en el fill calculadas para {k} alertas")
 
     ids = {a["id"] for a in alerts}
     seg["rows"] = {k: v for k, v in seg["rows"].items() if k in ids}
     with_row = sum(1 for v in seg["rows"].values() if v.get("row"))
+    con_fill = sum(1 for a in alerts if a.get("fill_date"))
+    with_fill_row = sum(1 for a in alerts if a.get("fill_date")
+                        and (seg["rows"].get(a["id"], {}).get("row_fill") or {}).get("asof") == a["fill_date"])
+    sin_snap = sum(1 for v in seg["rows"].values() if v.get("row_fill_falta"))
     with_m5 = sum(1 for v in seg["rows"].values() if isinstance((v.get("ema_fill") or {}).get("m5"), dict)
                   and (v["ema_fill"]["m5"] or {}).get("d20") is not None)
     seg["resumen"] = {"alertas": len(alerts), "con_parametros": with_row, "con_ema_5m": with_m5,
+                      "con_fill": con_fill, "con_parametros_fill": with_fill_row, "fill_sin_snapshot": sin_snap,
                       "actualizado": datetime.now(timezone.utc).isoformat()[:19] + "Z"}
     with open(OUT, "w", encoding="utf-8") as f:
         json.dump(json_safe(seg), f, ensure_ascii=False, allow_nan=False, separators=(",", ":"))
-    print(f"  {with_row}/{len(alerts)} alertas con parámetros · {with_m5} con EMA 5 min en el fill → {OUT}")
+    print(f"  Parámetros del día del fill: {with_fill_row}/{con_fill} alertas con fill"
+          f"{f' ({sin_snap} sin snapshot de ese día)' if sin_snap else ''} · día de la señal: {with_row}/{len(alerts)}"
+          f" · {with_m5} con EMA 5 min en el fill → {OUT}")
 
 
 if __name__ == "__main__":

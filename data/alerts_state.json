@@ -1,9 +1,17 @@
 {
   "2026-10-06": [
+    "ABEV",
     "ASC",
+    "AVEE",
+    "BBB",
     "BOAT",
+    "BP",
     "BWLP",
+    "DAT",
+    "EMOP",
     "ENS",
+    "FDTS",
+    "LPG",
     "MOG/A",
     "NEU",
     "PLX",
@@ -12,7 +20,13 @@
     "RDVT",
     "RS",
     "SDEM",
+    "SHEH",
+    "SHEL",
+    "SSL",
+    "SXI",
+    "TNK",
     "UFPT",
-    "URBN"
+    "URBN",
+    "WCC"
   ]
 }

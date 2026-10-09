@@ -1,5 +1,5 @@
 {
-  "checked_at": "2026-10-08 20:12:00 (Hora Colombia)",
+  "checked_at": "2026-10-08 20:19:22 (Hora Colombia)",
   "regime": {
     "regime": "BULL",
     "icon": "\ud83d\udfe2",
@@ -10,7 +10,7 @@
     "drawdown_52w_pct": -0.67,
     "realized_vol_20d": 10.2
   },
-  "confirmed": 16,
+  "confirmed": 15,
   "signals": [
     {
       "ticker": "BWLP",
@@ -44,7 +44,7 @@
       "prob": 95,
       "buffett": 55,
       "mos": -20.9,
-      "rs_rank": 99,
+      "rs_rank": 97,
       "asof": "2026-10-08",
       "live": null,
       "status": null,
@@ -210,31 +210,6 @@
       },
       "periods": [
         "1 Semana",
-        "3 Meses",
-        "6 Meses"
-      ]
-    },
-    {
-      "ticker": "ANET",
-      "composite": 80,
-      "prob": 95,
-      "buffett": 70,
-      "mos": -86.3,
-      "rs_rank": 90,
-      "asof": "2026-10-08",
-      "live": null,
-      "status": null,
-      "max_chase": null,
-      "group": "\ud83c\udfaf Watchlist Core",
-      "zones": {
-        "entry": 208.74,
-        "tp1": 215.76,
-        "tp2": 222.78,
-        "sl": 198.21
-      },
-      "periods": [
-        "1 Semana",
-        "1 Mes",
         "3 Meses",
         "6 Meses"
       ]

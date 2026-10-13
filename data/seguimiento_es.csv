@@ -419,18 +419,31 @@ IEO;ETF;Exchange Traded Fund;08/10/2026;09/10/2026;143,91;147,27;150,63;138,87;;
 BOAT;ETF;Exchange Traded Fund;08/10/2026;09/10/2026;53,03;54,06;55,09;51,48;;54,5;0,0277;PARCIAL TP1;0,44;0,16;0,28;0,14;-1,89;-1,75;-1,25;-11;-9,75;Local Max;-0,0274;-0,0606;0,0014;0,0701;Evitar;73,77;Strong/Strong Buy;1;B:11% N:16% Bu:24% S:49%;0,59;25;1.5:1;Señal máxima;56,48;0,7926;0,144;0,027;DÉBIL;ETF;;;;;Bullish;Oscillating;Temprano (75);65;buy
 KMLM;ETF;Exchange Traded Fund;08/10/2026;09/10/2026;31,21;31,58;31,95;30,66;;31,34;0,0042;ACTIVA;0,13;0,15;-0,02;0,11;-0,49;-0,38;-0,26;-2,58;-2,32;Local Max;-0,0185;-1,3252;0,0235;1,326;Evitar;73,77;Strong/Strong Buy;1;B:11% N:16% Bu:24% S:49%;0,78;25;1.5:1;Acumulación;32,33;0,724;0,067;0,001;DÉBIL;ETF;;;;;Bullish;Oscillating;Temprano (85);65;buy
 BWLP;Energy;Oil & Gas Midstream;09/10/2026;;25,76;26,55;27,34;24,58;;;;ESPERANDO FILL;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-PLX;Healthcare;Biotechnology;09/10/2026;12/10/2026;2,74;2,84;2,94;2,59;;2,78;0,0146;ACTIVA;0,02;-0,01;0,01;-0,01;-0,07;-0,06;-0,03;-0,39;-0,36;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+PLX;Healthcare;Biotechnology;09/10/2026;12/10/2026;2,74;2,84;2,94;2,59;;2,78;0,0146;ACTIVA;0,02;-0,01;0,01;-0,01;-0,07;-0,06;-0,03;-0,39;-0,36;Saddle;-0,055;0,2703;-0,015;0,2764;Esperar;73,77;Strong/Strong Buy;1;B:11% N:16% Bu:24% S:49%;0,91;94;1.5:1;Acumulación;2,97;0,95;0,14;0,004;EXCELENTE;36,5;15,4;22;Alta;Mod;Bullish;Unstable;Temprano (90);45;avoid
 LPG;Energy;Oil & Gas Midstream;09/10/2026;;56,89;59,04;61,19;53,66;;;;ESPERANDO FILL;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-CBOE;Financial;Financial Data & Stock Exchanges;09/10/2026;12/10/2026;301,12;312,84;324,56;283,54;;297,39;-0,0124;ACTIVA;3,58;-0,73;2,85;-1,92;-19;-17,08;-19,49;-21,03;-1,54;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-SEZL;Financial;Credit Services;09/10/2026;12/10/2026;126,74;132,85;138,96;117,57;;130,48;0,0295;ACTIVA;1;-5,98;-4,98;-5,31;-9,62;-4,31;-10,1;-14,77;-4,67;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+CBOE;Financial;Financial Data & Stock Exchanges;09/10/2026;12/10/2026;301,12;312,84;324,56;283,54;;297,39;-0,0124;ACTIVA;3,58;-0,73;2,85;-1,92;-19;-17,08;-19,49;-21,03;-1,54;Local Min;0,0209;0,2378;0,0047;0,2398;Comprar;70,21;Strong/Strong Buy;1;B:14% N:18% Bu:25% S:42%;0,91;90;1.5:1;Señal máxima;320,75;0,95;0,176;0,045;EXCELENTE;7,9;11,6;50,2;Alta;Mod;Bullish;Oscillating;Temprano (90);65;buy
+SEZL;Financial;Credit Services;09/10/2026;12/10/2026;126,74;132,85;138,96;117,57;;130,48;0,0295;ACTIVA;1;-5,98;-4,98;-5,31;-9,62;-4,31;-10,1;-14,77;-4,67;Local Min;0,0329;0,2805;0,0086;0,2847;Comprar;67,64;Bullish/Strong Buy;0,859;B:11% N:16% Bu:24% S:48%;0,88;85;1.5:1;Acumulación;139,41;0,95;0,14;0,073;EXCELENTE;70,4;48,8;47,7;Alta;Bajo;Bullish;Unstable;Fresco (60);55;hold
 SHEL;Energy;Oil & Gas Integrated;09/10/2026;;99,66;101,38;103,1;97,08;;;;ESPERANDO FILL;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 NMM;Industrials;Marine Shipping;09/10/2026;;92,16;94,5;96,84;88,65;;;;ESPERANDO FILL;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-KEYS;Technology;Scientific & Technical Instruments;09/10/2026;12/10/2026;379,44;390,01;400,58;363,58;;377,69;-0,0046;ACTIVA;1,76;0,18;1,58;0,57;-23,78;-23,21;-15,4;-73,37;-57,97;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-RDVT;Technology;Software - Application;09/10/2026;12/10/2026;79,21;81,87;84,53;75,22;;80,17;0,0121;ACTIVA;0,79;0,01;0,78;0,12;-2,6;-2,48;-1,27;-18,99;-17,72;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+KEYS;Technology;Scientific & Technical Instruments;09/10/2026;12/10/2026;379,44;390,01;400,58;363,58;;377,69;-0,0046;ACTIVA;1,76;0,18;1,58;0,57;-23,78;-23,21;-15,4;-73,37;-57,97;Saddle;0,0759;-0,2629;-0,0209;0,277;Esperar;72,51;Bullish/Strong Buy;0,897;B:8% N:14% Bu:23% S:55%;0,94;76;1.5:1;Acumulación;397,11;0,8705;0,049;0,199;BUENO;-0,1;7,2;107,9;Alta;Mod;Bullish;Oscillating;Tardio (35);65;buy
+RDVT;Technology;Software - Application;09/10/2026;12/10/2026;79,21;81,87;84,53;75,22;;80,17;0,0121;ACTIVA;0,79;0,01;0,78;0,12;-2,6;-2,48;-1,27;-18,99;-17,72;Local Max;-0,0109;-0,6448;0,007;0,645;Evitar;73,08;Strong/Strong Buy;1;B:11% N:16% Bu:24% S:48%;0,94;71;1.5:1;Señal activa;85,02;0,927;0,122;0,051;BUENO;-5,2;10;84,7;Alta;Bajo;Bullish;Unstable;Fresco (60);45;avoid
 BP;Energy;Oil & Gas Integrated;09/10/2026;;45,92;47,02;48,12;44,27;;;;ESPERANDO FILL;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 OTGL;ETF;Exchange Traded Fund;09/10/2026;;11,42;11,64;11,86;11,09;;;;ESPERANDO FILL;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 IEO;ETF;Exchange Traded Fund;09/10/2026;;142,62;145,98;149,34;137,58;;;;ESPERANDO FILL;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 BOAT;ETF;Exchange Traded Fund;09/10/2026;;53,08;54,1;55,12;51,55;;;;ESPERANDO FILL;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-CRAK;ETF;Exchange Traded Fund;09/10/2026;12/10/2026;65,91;67,17;68,43;64,02;;65,81;-0,0015;ACTIVA;0,45;0,6;-0,15;0,46;-2,08;-1,62;-1,2;-13,95;-12,75;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-MFEM;ETF;Exchange Traded Fund;09/10/2026;12/10/2026;28,81;29,2;29,59;28,22;;28,66;-0,0052;ACTIVA;0,06;0,03;0,03;0,07;-0,17;-0,1;-0,12;-2,2;-2,08;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+CRAK;ETF;Exchange Traded Fund;09/10/2026;12/10/2026;65,91;67,17;68,43;64,02;;65,81;-0,0015;ACTIVA;0,45;0,6;-0,15;0,46;-2,08;-1,62;-1,2;-13,95;-12,75;Local Max;-0,0169;-0,2608;0,0044;0,2614;Evitar;63,55;Bullish/Strong Buy;0,824;B:14% N:18% Bu:25% S:42%;0,78;25;1.5:1;Acumulación;68,47;0,7281;0,088;0,021;DÉBIL;ETF;;;;;Bullish;Oscillating;Temprano (90);65;buy
+MFEM;ETF;Exchange Traded Fund;09/10/2026;12/10/2026;28,81;29,2;29,59;28,22;;28,66;-0,0052;ACTIVA;0,06;0,03;0,03;0,07;-0,17;-0,1;-0,12;-2,2;-2,08;Saddle;0,0056;-3,1217;-0,0217;3,1231;Esperar;57,25;Bullish/Strong Buy;0,764;B:20% N:21% Bu:25% S:35%;0,73;25;1.5:1;Espera;29,63;0,7033;0,071;0,019;DÉBIL;ETF;;;;;Bullish;Oscillating;Temprano (95);65;buy
 ANET;Technology;Computer Hardware;12/10/2026;;208,79;215,74;222,69;198,36;;;;ESPERANDO FILL;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+URBN;Consumer Cyclical;Apparel Retail;12/10/2026;;81,93;84,47;87,01;78,12;;;;ESPERANDO FILL;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+LPG;Energy;Oil & Gas Midstream;12/10/2026;;57,59;59,74;61,89;54,37;;;;ESPERANDO FILL;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+ASC;Industrials;Marine Shipping;12/10/2026;;19,61;20,31;21,01;18,56;;;;ESPERANDO FILL;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+CBOE;Financial;Financial Data & Stock Exchanges;12/10/2026;;293,81;305,7;317,59;275,98;;;;ESPERANDO FILL;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+NMM;Industrials;Marine Shipping;12/10/2026;;95,51;97,93;100,35;91,88;;;;ESPERANDO FILL;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+ZBRA;Technology;Communication Equipment;12/10/2026;;385,15;395,04;404,93;370,31;;;;ESPERANDO FILL;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+RDVT;Technology;Software - Application;12/10/2026;;79,36;82,07;84,78;75,3;;;;ESPERANDO FILL;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+BP;Energy;Oil & Gas Integrated;12/10/2026;;46,4;47,49;48,58;44,77;;;;ESPERANDO FILL;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+OTGL;ETF;Exchange Traded Fund;12/10/2026;;11,51;11,72;11,93;11,2;;;;ESPERANDO FILL;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+FXN;ETF;Exchange Traded Fund;12/10/2026;;23,47;23,95;24,43;22,75;;;;ESPERANDO FILL;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+EMDV;ETF;Exchange Traded Fund;12/10/2026;;47,16;47,42;47,68;46,77;;;;ESPERANDO FILL;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+LATR;ETF;Exchange Traded Fund;12/10/2026;;27,37;27,68;27,99;26,91;;;;ESPERANDO FILL;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+BBB;ETF;Exchange Traded Fund;12/10/2026;;32,39;32,66;32,93;31,98;;;;ESPERANDO FILL;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

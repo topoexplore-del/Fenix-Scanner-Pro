@@ -1,5 +1,5 @@
 {
-  "checked_at": "2026-10-20 18:46:00 (Hora Colombia)",
+  "checked_at": "2026-10-21 14:09:52 (Hora Colombia)",
   "regime": {
     "regime": "BULL",
     "icon": "\ud83d\udfe2",
@@ -918,9 +918,9 @@
       "group": "\ud83d\udcca \u00cdndices Mundiales",
       "zones": {
         "entry": 75.12,
-        "tp1": 76.39,
-        "tp2": 77.66,
-        "sl": 73.22
+        "tp1": 76.4,
+        "tp2": 77.68,
+        "sl": 73.2
       },
       "periods": [
         "1 Semana"

@@ -1,5 +1,5 @@
 {
-  "checked_at": "2026-10-22 19:00:21 (Hora Colombia)",
+  "checked_at": "2026-10-23 13:57:26 (Hora Colombia)",
   "regime": {
     "regime": "BULL",
     "icon": "\ud83d\udfe2",
@@ -10,7 +10,7 @@
     "drawdown_52w_pct": -1.94,
     "realized_vol_20d": 9.8
   },
-  "confirmed": 59,
+  "confirmed": 58,
   "signals": [
     {
       "ticker": "SU",
@@ -281,28 +281,6 @@
         "1 Mes",
         "3 Meses",
         "6 Meses"
-      ]
-    },
-    {
-      "ticker": "EWW",
-      "composite": 25,
-      "prob": 95,
-      "buffett": 5,
-      "mos": null,
-      "rs_rank": 55,
-      "asof": "2026-10-22",
-      "live": null,
-      "status": null,
-      "max_chase": null,
-      "group": "\ud83d\udcca \u00cdndices Mundiales",
-      "zones": {
-        "entry": 74.56,
-        "tp1": 75.82,
-        "tp2": 77.08,
-        "sl": 72.67
-      },
-      "periods": [
-        "1-3 Meses"
       ]
     },
     {

@@ -1,5 +1,5 @@
 {
-  "checked_at": "2026-10-26 19:49:12 (Hora Colombia)",
+  "checked_at": "2026-10-27 14:53:26 (Hora Colombia)",
   "regime": {
     "regime": "BULL",
     "icon": "\ud83d\udfe2",
@@ -378,17 +378,17 @@
       "prob": 95,
       "buffett": 5,
       "mos": null,
-      "rs_rank": 46,
+      "rs_rank": 48,
       "asof": "2026-10-26",
       "live": null,
       "status": null,
       "max_chase": null,
       "group": "\ud83d\udcca \u00cdndices Mundiales",
       "zones": {
-        "entry": 74.93,
-        "tp1": 76.2,
-        "tp2": 77.47,
-        "sl": 73.03
+        "entry": 74.92,
+        "tp1": 76.19,
+        "tp2": 77.46,
+        "sl": 73.02
       },
       "periods": [
         "1-3 Meses"

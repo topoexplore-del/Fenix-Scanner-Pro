@@ -1,5 +1,5 @@
 {
-  "checked_at": "2026-11-05 20:34:33 (Hora Colombia)",
+  "checked_at": "2026-11-06 15:45:27 (Hora Colombia)",
   "regime": {
     "regime": "BULL",
     "icon": "\ud83d\udfe2",
@@ -590,17 +590,17 @@
       "prob": 63,
       "buffett": 0,
       "mos": null,
-      "rs_rank": 66,
+      "rs_rank": 80,
       "asof": "2026-11-05",
       "live": null,
       "status": null,
       "max_chase": null,
       "group": "\ud83d\udcca \u00cdndices Mundiales",
       "zones": {
-        "entry": 52.07,
-        "tp1": 53.01,
-        "tp2": 53.95,
-        "sl": 50.66
+        "entry": 52.05,
+        "tp1": 52.99,
+        "tp2": 53.93,
+        "sl": 50.64
       },
       "periods": [
         "1-3 Meses"
@@ -830,20 +830,20 @@
     {
       "ticker": "FEGE",
       "composite": 15,
-      "prob": 59,
+      "prob": 56,
       "buffett": 5,
       "mos": null,
-      "rs_rank": 70,
+      "rs_rank": 86,
       "asof": "2026-11-05",
       "live": null,
       "status": null,
       "max_chase": null,
       "group": "\ud83c\udfaf Watchlist Core",
       "zones": {
-        "entry": 52.38,
-        "tp1": 52.98,
-        "tp2": 53.58,
-        "sl": 51.48
+        "entry": 52.45,
+        "tp1": 53.05,
+        "tp2": 53.65,
+        "sl": 51.55
       },
       "periods": [
         "1-3 Meses"

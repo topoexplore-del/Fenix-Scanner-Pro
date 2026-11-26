@@ -1,5 +1,5 @@
 {
-  "checked_at": "2026-11-25 18:31:42 (Hora Colombia)",
+  "checked_at": "2026-11-25 22:18:42 (Hora Colombia)",
   "regime": {
     "regime": "NEUTRAL",
     "icon": "\ud83d\udfe1",
@@ -10,33 +10,705 @@
     "drawdown_52w_pct": -8.01,
     "realized_vol_20d": 31.6
   },
-  "confirmed": 1,
+  "confirmed": 29,
   "signals": [
     {
-      "ticker": "A",
-      "composite": 69,
+      "ticker": "CRT",
+      "composite": 90,
       "prob": 95,
-      "buffett": 85,
-      "mos": -70.3,
-      "rs_rank": 98,
-      "asof": "2026-11-24",
+      "buffett": 65,
+      "mos": -83.7,
+      "rs_rank": 99,
+      "asof": "2026-11-25",
+      "live": null,
+      "status": null,
+      "max_chase": null,
+      "group": "\ud83c\udf10 Listado completo",
+      "zones": {
+        "entry": 13.62,
+        "tp1": 14.17,
+        "tp2": 14.72,
+        "sl": 12.79
+      },
+      "periods": [
+        "1 Semana",
+        "3 Meses",
+        "6 Meses",
+        "1 A\u00f1o"
+      ]
+    },
+    {
+      "ticker": "EXLS",
+      "composite": 79,
+      "prob": 95,
+      "buffett": 70,
+      "mos": -66.3,
+      "rs_rank": 96,
+      "asof": "2026-11-25",
+      "live": null,
+      "status": null,
+      "max_chase": null,
+      "group": "\ud83c\udf10 Listado completo",
+      "zones": {
+        "entry": 44.72,
+        "tp1": 45.98,
+        "tp2": 47.24,
+        "sl": 42.83
+      },
+      "periods": [
+        "1 Semana",
+        "1 Mes",
+        "3 Meses",
+        "6 Meses"
+      ]
+    },
+    {
+      "ticker": "CNI",
+      "composite": 74,
+      "prob": 95,
+      "buffett": 65,
+      "mos": -54.2,
+      "rs_rank": 82,
+      "asof": "2026-11-25",
+      "live": null,
+      "status": null,
+      "max_chase": null,
+      "group": "\ud83c\udf10 Listado completo",
+      "zones": {
+        "entry": 125.64,
+        "tp1": 128.17,
+        "tp2": 130.7,
+        "sl": 121.84
+      },
+      "periods": [
+        "3 Meses"
+      ]
+    },
+    {
+      "ticker": "SPGI",
+      "composite": 64,
+      "prob": 95,
+      "buffett": 90,
+      "mos": -65.3,
+      "rs_rank": 84,
+      "asof": "2026-11-25",
       "live": null,
       "status": null,
       "max_chase": null,
       "group": "\ud83c\uddfa\ud83c\uddf8 US Market",
       "zones": {
-        "entry": 181.77,
-        "tp1": 187.61,
-        "tp2": 193.45,
-        "sl": 173.01
+        "entry": 457.37,
+        "tp1": 468.59,
+        "tp2": 479.81,
+        "sl": 440.54
       },
       "periods": [
         "1 Semana",
+        "3 Meses",
+        "6 Meses"
+      ]
+    },
+    {
+      "ticker": "AWR",
+      "composite": 59,
+      "prob": 95,
+      "buffett": 55,
+      "mos": -45.3,
+      "rs_rank": 83,
+      "asof": "2026-11-25",
+      "live": null,
+      "status": null,
+      "max_chase": null,
+      "group": "\ud83c\udf10 Listado completo",
+      "zones": {
+        "entry": 88.42,
+        "tp1": 90.11,
+        "tp2": 91.8,
+        "sl": 85.89
+      },
+      "periods": [
         "3 Meses"
+      ]
+    },
+    {
+      "ticker": "FLRT",
+      "composite": 25,
+      "prob": 88,
+      "buffett": 5,
+      "mos": null,
+      "rs_rank": 83,
+      "asof": "2026-11-25",
+      "live": null,
+      "status": null,
+      "max_chase": null,
+      "group": "\ud83c\udf10 Listado completo",
+      "zones": {
+        "entry": 46.17,
+        "tp1": 46.29,
+        "tp2": 46.41,
+        "sl": 45.99
+      },
+      "periods": [
+        "1 Mes"
+      ]
+    },
+    {
+      "ticker": "FSCS",
+      "composite": 25,
+      "prob": 88,
+      "buffett": 5,
+      "mos": null,
+      "rs_rank": 71,
+      "asof": "2026-11-25",
+      "live": null,
+      "status": null,
+      "max_chase": null,
+      "group": "\ud83c\udf10 Listado completo",
+      "zones": {
+        "entry": 37.12,
+        "tp1": 37.62,
+        "tp2": 38.12,
+        "sl": 36.37
+      },
+      "periods": [
+        "1 Mes"
+      ]
+    },
+    {
+      "ticker": "LSAT",
+      "composite": 25,
+      "prob": 88,
+      "buffett": 5,
+      "mos": null,
+      "rs_rank": 89,
+      "asof": "2026-11-25",
+      "live": null,
+      "status": null,
+      "max_chase": null,
+      "group": "\ud83c\udf10 Listado completo",
+      "zones": {
+        "entry": 48.05,
+        "tp1": 48.76,
+        "tp2": 49.47,
+        "sl": 46.98
+      },
+      "periods": [
+        "1 Mes"
+      ]
+    },
+    {
+      "ticker": "ABCS",
+      "composite": 25,
+      "prob": 85,
+      "buffett": 5,
+      "mos": null,
+      "rs_rank": 72,
+      "asof": "2026-11-25",
+      "live": null,
+      "status": null,
+      "max_chase": null,
+      "group": "\ud83c\udf10 Listado completo",
+      "zones": {
+        "entry": 35.5,
+        "tp1": 36.0,
+        "tp2": 36.5,
+        "sl": 34.75
+      },
+      "periods": [
+        "1 Mes"
+      ]
+    },
+    {
+      "ticker": "KBWP",
+      "composite": 25,
+      "prob": 84,
+      "buffett": 5,
+      "mos": null,
+      "rs_rank": 94,
+      "asof": "2026-11-25",
+      "live": null,
+      "status": null,
+      "max_chase": null,
+      "group": "\ud83c\udf10 Listado completo",
+      "zones": {
+        "entry": 145.5,
+        "tp1": 147.98,
+        "tp2": 150.46,
+        "sl": 141.78
+      },
+      "periods": [
+        "1 Semana",
+        "1-3 Meses"
+      ]
+    },
+    {
+      "ticker": "IBHF",
+      "composite": 25,
+      "prob": 83,
+      "buffett": 5,
+      "mos": null,
+      "rs_rank": 85,
+      "asof": "2026-11-25",
+      "live": null,
+      "status": null,
+      "max_chase": null,
+      "group": "\ud83c\udf10 Listado completo",
+      "zones": {
+        "entry": 22.51,
+        "tp1": 22.55,
+        "tp2": 22.59,
+        "sl": 22.45
+      },
+      "periods": [
+        "1 Mes"
+      ]
+    },
+    {
+      "ticker": "FTA",
+      "composite": 25,
+      "prob": 82,
+      "buffett": 5,
+      "mos": null,
+      "rs_rank": 82,
+      "asof": "2026-11-25",
+      "live": null,
+      "status": null,
+      "max_chase": null,
+      "group": "\ud83c\udf10 Listado completo",
+      "zones": {
+        "entry": 102.69,
+        "tp1": 104.07,
+        "tp2": 105.45,
+        "sl": 100.62
+      },
+      "periods": [
+        "1 Mes"
+      ]
+    },
+    {
+      "ticker": "FAB",
+      "composite": 25,
+      "prob": 82,
+      "buffett": 5,
+      "mos": null,
+      "rs_rank": 75,
+      "asof": "2026-11-25",
+      "live": null,
+      "status": null,
+      "max_chase": null,
+      "group": "\ud83c\udf10 Listado completo",
+      "zones": {
+        "entry": 105.4,
+        "tp1": 106.77,
+        "tp2": 108.14,
+        "sl": 103.34
+      },
+      "periods": [
+        "1 Mes"
+      ]
+    },
+    {
+      "ticker": "CSB",
+      "composite": 25,
+      "prob": 75,
+      "buffett": 5,
+      "mos": null,
+      "rs_rank": 75,
+      "asof": "2026-11-25",
+      "live": null,
+      "status": null,
+      "max_chase": null,
+      "group": "\ud83c\udf10 Listado completo",
+      "zones": {
+        "entry": 65.56,
+        "tp1": 66.43,
+        "tp2": 67.3,
+        "sl": 64.25
+      },
+      "periods": [
+        "1 Mes"
+      ]
+    },
+    {
+      "ticker": "DVY",
+      "composite": 25,
+      "prob": 74,
+      "buffett": 5,
+      "mos": null,
+      "rs_rank": 62,
+      "asof": "2026-11-25",
+      "live": null,
+      "status": null,
+      "max_chase": null,
+      "group": "\ud83d\udcbc ETFs Globales",
+      "zones": {
+        "entry": 159.68,
+        "tp1": 161.96,
+        "tp2": 164.24,
+        "sl": 156.26
+      },
+      "periods": [
+        "1 Mes"
+      ]
+    },
+    {
+      "ticker": "GCOW",
+      "composite": 25,
+      "prob": 62,
+      "buffett": 5,
+      "mos": null,
+      "rs_rank": 78,
+      "asof": "2026-11-25",
+      "live": null,
+      "status": null,
+      "max_chase": null,
+      "group": "\ud83c\udf10 Listado completo",
+      "zones": {
+        "entry": 46.62,
+        "tp1": 47.19,
+        "tp2": 47.76,
+        "sl": 45.77
+      },
+      "periods": [
+        "1 Mes"
+      ]
+    },
+    {
+      "ticker": "DSMC",
+      "composite": 25,
+      "prob": 61,
+      "buffett": 5,
+      "mos": null,
+      "rs_rank": 83,
+      "asof": "2026-11-25",
+      "live": null,
+      "status": null,
+      "max_chase": null,
+      "group": "\ud83c\udf10 Listado completo",
+      "zones": {
+        "entry": 44.19,
+        "tp1": 44.87,
+        "tp2": 45.55,
+        "sl": 43.17
+      },
+      "periods": [
+        "1 Mes"
+      ]
+    },
+    {
+      "ticker": "GRPM",
+      "composite": 25,
+      "prob": 61,
+      "buffett": 5,
+      "mos": null,
+      "rs_rank": 67,
+      "asof": "2026-11-25",
+      "live": null,
+      "status": null,
+      "max_chase": null,
+      "group": "\ud83c\udf10 Listado completo",
+      "zones": {
+        "entry": 141.75,
+        "tp1": 144.29,
+        "tp2": 146.83,
+        "sl": 137.94
+      },
+      "periods": [
+        "1 Mes"
+      ]
+    },
+    {
+      "ticker": "QVAL",
+      "composite": 25,
+      "prob": 61,
+      "buffett": 5,
+      "mos": null,
+      "rs_rank": 86,
+      "asof": "2026-11-25",
+      "live": null,
+      "status": null,
+      "max_chase": null,
+      "group": "\ud83c\udf10 Listado completo",
+      "zones": {
+        "entry": 62.19,
+        "tp1": 63.25,
+        "tp2": 64.31,
+        "sl": 60.6
+      },
+      "periods": [
+        "1 Mes"
+      ]
+    },
+    {
+      "ticker": "XUDV",
+      "composite": 25,
+      "prob": 61,
+      "buffett": 5,
+      "mos": null,
+      "rs_rank": 63,
+      "asof": "2026-11-25",
+      "live": null,
+      "status": null,
+      "max_chase": null,
+      "group": "\ud83c\udf10 Listado completo",
+      "zones": {
+        "entry": 32.3,
+        "tp1": 32.78,
+        "tp2": 33.26,
+        "sl": 31.58
+      },
+      "periods": [
+        "1 Mes"
+      ]
+    },
+    {
+      "ticker": "ZIG",
+      "composite": 25,
+      "prob": 61,
+      "buffett": 5,
+      "mos": null,
+      "rs_rank": 67,
+      "asof": "2026-11-25",
+      "live": null,
+      "status": null,
+      "max_chase": null,
+      "group": "\ud83c\udf10 Listado completo",
+      "zones": {
+        "entry": 39.75,
+        "tp1": 40.25,
+        "tp2": 40.75,
+        "sl": 39.0
+      },
+      "periods": [
+        "1 Mes"
+      ]
+    },
+    {
+      "ticker": "SPVM",
+      "composite": 25,
+      "prob": 60,
+      "buffett": 5,
+      "mos": null,
+      "rs_rank": 76,
+      "asof": "2026-11-25",
+      "live": null,
+      "status": null,
+      "max_chase": null,
+      "group": "\ud83c\udf10 Listado completo",
+      "zones": {
+        "entry": 76.28,
+        "tp1": 77.29,
+        "tp2": 78.3,
+        "sl": 74.77
+      },
+      "periods": [
+        "1 Mes"
+      ]
+    },
+    {
+      "ticker": "RDIV",
+      "composite": 25,
+      "prob": 59,
+      "buffett": 5,
+      "mos": null,
+      "rs_rank": 75,
+      "asof": "2026-11-25",
+      "live": null,
+      "status": null,
+      "max_chase": null,
+      "group": "\ud83c\udf10 Listado completo",
+      "zones": {
+        "entry": 61.89,
+        "tp1": 62.83,
+        "tp2": 63.77,
+        "sl": 60.48
+      },
+      "periods": [
+        "1-3 Meses"
+      ]
+    },
+    {
+      "ticker": "DRVR",
+      "composite": 15,
+      "prob": 60,
+      "buffett": 5,
+      "mos": null,
+      "rs_rank": 90,
+      "asof": "2026-11-25",
+      "live": null,
+      "status": null,
+      "max_chase": null,
+      "group": "\ud83c\udf10 Listado completo",
+      "zones": {
+        "entry": 26.55,
+        "tp1": 26.87,
+        "tp2": 27.19,
+        "sl": 26.07
+      },
+      "periods": [
+        "1-3 Meses"
+      ]
+    },
+    {
+      "ticker": "MOAT",
+      "composite": 15,
+      "prob": 59,
+      "buffett": 0,
+      "mos": null,
+      "rs_rank": 75,
+      "asof": "2026-11-25",
+      "live": null,
+      "status": null,
+      "max_chase": null,
+      "group": "\ud83c\udf10 Listado completo",
+      "zones": {
+        "entry": 113.7,
+        "tp1": 115.75,
+        "tp2": 117.8,
+        "sl": 110.62
+      },
+      "periods": [
+        "1-3 Meses"
+      ]
+    },
+    {
+      "ticker": "FIW",
+      "composite": 15,
+      "prob": 57,
+      "buffett": 0,
+      "mos": null,
+      "rs_rank": 92,
+      "asof": "2026-11-25",
+      "live": null,
+      "status": null,
+      "max_chase": null,
+      "group": "\ud83c\udf10 Listado completo",
+      "zones": {
+        "entry": 117.78,
+        "tp1": 119.84,
+        "tp2": 121.9,
+        "sl": 114.69
+      },
+      "periods": [
+        "1-3 Meses"
+      ]
+    },
+    {
+      "ticker": "INDS",
+      "composite": 15,
+      "prob": 57,
+      "buffett": 0,
+      "mos": null,
+      "rs_rank": 84,
+      "asof": "2026-11-25",
+      "live": null,
+      "status": null,
+      "max_chase": null,
+      "group": "\ud83c\udf10 Listado completo",
+      "zones": {
+        "entry": 40.12,
+        "tp1": 40.65,
+        "tp2": 41.18,
+        "sl": 39.32
+      },
+      "periods": [
+        "1-3 Meses"
+      ]
+    },
+    {
+      "ticker": "TMDV",
+      "composite": 15,
+      "prob": 57,
+      "buffett": 5,
+      "mos": null,
+      "rs_rank": 89,
+      "asof": "2026-11-25",
+      "live": null,
+      "status": null,
+      "max_chase": null,
+      "group": "\ud83c\udf10 Listado completo",
+      "zones": {
+        "entry": 54.47,
+        "tp1": 54.98,
+        "tp2": 55.49,
+        "sl": 53.7
+      },
+      "periods": [
+        "1-3 Meses"
+      ]
+    },
+    {
+      "ticker": "ONEV",
+      "composite": 15,
+      "prob": 55,
+      "buffett": 5,
+      "mos": null,
+      "rs_rank": 90,
+      "asof": "2026-11-25",
+      "live": null,
+      "status": null,
+      "max_chase": null,
+      "group": "\ud83c\udf10 Listado completo",
+      "zones": {
+        "entry": 154.2,
+        "tp1": 156.03,
+        "tp2": 157.86,
+        "sl": 151.45
+      },
+      "periods": [
+        "1-3 Meses"
       ]
     }
   ],
   "watchlist": [
+    {
+      "ticker": "ANF",
+      "failed": [
+        "Radar"
+      ]
+    },
+    {
+      "ticker": "PLX",
+      "failed": [
+        "Radar"
+      ]
+    },
+    {
+      "ticker": "SGHC",
+      "failed": [
+        "Radar"
+      ]
+    },
+    {
+      "ticker": "QNST",
+      "failed": [
+        "Analysis"
+      ]
+    },
+    {
+      "ticker": "NATL",
+      "failed": [
+        "Analysis"
+      ]
+    },
+    {
+      "ticker": "PVL",
+      "failed": [
+        "Radar"
+      ]
+    },
+    {
+      "ticker": "FOX",
+      "failed": [
+        "Radar"
+      ]
+    },
+    {
+      "ticker": "FOXA",
+      "failed": [
+        "Radar"
+      ]
+    },
     {
       "ticker": "DECK",
       "failed": [
@@ -44,87 +716,39 @@
       ]
     },
     {
-      "ticker": "STZ",
+      "ticker": "ELA",
       "failed": [
         "Radar"
       ]
     },
     {
-      "ticker": "PDD",
+      "ticker": "PANL",
       "failed": [
         "Radar"
       ]
     },
     {
-      "ticker": "FHI",
+      "ticker": "WEYS",
       "failed": [
         "Radar"
       ]
     },
     {
-      "ticker": "CPAY",
+      "ticker": "UPBD",
+      "failed": [
+        "Radar"
+      ]
+    },
+    {
+      "ticker": "JL",
+      "failed": [
+        "Radar"
+      ]
+    },
+    {
+      "ticker": "RL",
       "failed": [
         "Analysis"
-      ]
-    },
-    {
-      "ticker": "TOST",
-      "failed": [
-        "Radar"
-      ]
-    },
-    {
-      "ticker": "SEZL",
-      "failed": [
-        "Entry Zones"
-      ]
-    },
-    {
-      "ticker": "CBOE",
-      "failed": [
-        "Radar"
-      ]
-    },
-    {
-      "ticker": "FMX",
-      "failed": [
-        "Radar"
-      ]
-    },
-    {
-      "ticker": "ADP",
-      "failed": [
-        "Analysis"
-      ]
-    },
-    {
-      "ticker": "AMGN",
-      "failed": [
-        "Analysis"
-      ]
-    },
-    {
-      "ticker": "BOOT",
-      "failed": [
-        "Radar"
-      ]
-    },
-    {
-      "ticker": "RCL",
-      "failed": [
-        "Analysis"
-      ]
-    },
-    {
-      "ticker": "DG",
-      "failed": [
-        "Analysis"
-      ]
-    },
-    {
-      "ticker": "YMM",
-      "failed": [
-        "Radar"
       ]
     }
   ]
